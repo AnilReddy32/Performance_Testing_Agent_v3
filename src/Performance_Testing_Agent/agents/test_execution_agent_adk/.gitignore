@@ -1,0 +1,13 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+*.db
+.DS_Store
+.pytest_cache/
+
+generated_scripts/
+generated_data/
+
+debug_generate.py
+debug_jemeter.py
