@@ -1,11 +1,21 @@
 from google.adk.agents import Agent
+from google.adk.tools import ToolContext
 
 from app.tools.tool_executor import handle_test_request
 
+def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict:
+    """Runs the ADK test-execution pipeline and stores the result in shared
+    session state so downstream agents (analysis, report) read the exact
+    same numbers."""
+
+    result = handle_test_request(user_request)
+    tool_context.state["test_execution_result"] = result
+    # return result
 
 root_agent = Agent(
     name="test_execution_agent",
     model="openai/gpt-4o-mini",
+    mode = "single_turn", # call-and-return, matches the orchestrator's other sub-agents
     instruction="""
 You are the Test Execution Agent for an intelligent performance-testing
 system.
@@ -42,10 +52,6 @@ Do not answer unrelated questions such as general programming,
 general knowledge, mathematics, weather, geography, or other
 non-performance-testing topics.
 
-The system should respond:
-
-"I can only help with performance-testing requests."
-
 IMPORTANT:
 
 Do not pretend to execute a test.
@@ -80,8 +86,10 @@ For execution requests, the execution workflow handles:
 Generation-only requests must NOT automatically execute a test.
 
 The final standardized execution result must preserve the exact 13-field contract required by the downstream Analysis Agent.
+
+Once the execution is completed provide the metrics to the user.
 """,
     tools=[
-        handle_test_request,
+        run_test_execution_adk,
     ],
 )

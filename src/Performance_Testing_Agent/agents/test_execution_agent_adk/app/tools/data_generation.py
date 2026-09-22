@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GENERATED_DATA_DIR = "generated_data"
+# from pathlib import Path
+# GENERATED_DATA_DIR = str(Path(__file__).resolve().parent.parent / "generated_data")
 
 
 class TestDataGenerator:

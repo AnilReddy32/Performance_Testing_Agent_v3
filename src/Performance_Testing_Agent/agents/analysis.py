@@ -2,7 +2,7 @@ from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools import ToolContext
 
-from Performance_Testing_Agent.config import LITELLM_MODEL_NAME, TEMPERATURE
+from ..config import LITELLM_MODEL_NAME, TEMPERATURE
 
 
 def run_analysis(tool_context: ToolContext) -> dict:

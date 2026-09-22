@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+truststore
 google-adk
 litellm
 openai

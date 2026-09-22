@@ -4,6 +4,9 @@ from app.tools.artifact_generator import ArtifactGenerator
 
 
 GENERATED_SCRIPTS_DIR = "generated_scripts"
+# from pathlib import Path
+# GENERATED_SCRIPTS_DIR = str(Path(__file__).resolve().parent.parent / "generated_scripts")
+
 
 
 def generate_script(

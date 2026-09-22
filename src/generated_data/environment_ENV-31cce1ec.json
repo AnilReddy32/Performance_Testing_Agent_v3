@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-31cce1ec",
+  "application": "NEFT",
+  "scenario": "Fund Transfer",
+  "environment": "test",
+  "users": 2000,
+  "requirements": "",
+  "prepared_at": "2026-09-22T15:58:34.381344",
+  "status": "prepared"
+}
