@@ -1,0 +1,112 @@
+{
+  "application": {
+    "name": "Demo Banking API",
+    "version": "1.0.0",
+    "environment": "development"
+  },
+
+  "authentication": {
+  "enabled": true,
+  "type": "JWT",
+  "token_location": "Authorization header",
+  "scheme": "Bearer",
+  "jwt": {
+    "signature_validation": true,
+    "expiration_validation": true,
+    "issuer_validation": true,
+    "audience_validation": true,
+    "algorithm_validation": true,
+    "allowed_algorithms": [
+      "RS256"
+    ]
+  }
+},
+
+  "authorization": {
+    "enabled": true,
+    "type": "RBAC",
+    "roles": [
+      "admin",
+      "user"
+    ],
+    "role_permission_validation": true
+  },
+
+  "api": {
+    "base_url": "https://example.internal/api",
+    "version": "v1",
+    "endpoints": [
+      {
+        "path": "/login",
+        "method": "POST",
+        "authentication_required": false,
+        "rate_limit": {
+          "enabled": true,
+          "requests_per_minute": 10
+        }
+      },
+      {
+        "path": "/users",
+        "method": "GET",
+        "authentication_required": true,
+        "authorization_required": true,
+        "allowed_roles": [
+          "admin"
+        ],
+        "rate_limit": {
+          "enabled": true,
+          "requests_per_minute": 60
+        }
+      },
+      {
+        "path": "/profile",
+        "method": "GET",
+        "authentication_required": true,
+        "authorization_required": true,
+        "allowed_roles": [
+          "admin",
+          "user"
+        ],
+        "rate_limit": {
+          "enabled": false,
+          "requests_per_minute": 10
+        }
+      }
+    ]
+  },
+
+  "sql_security": {
+    "parameterized_queries": false,
+    "prepared_statements": true
+  },
+
+  "xss_security": {
+    "input_sanitization": true,
+    "output_encoding": true
+  },
+
+  "csrf_security": {
+    "protection_enabled": true,
+    "csrf_token_validation": true
+  },
+
+  "oauth": {
+    "enabled": true,
+    "provider": "Example OAuth Provider",
+    "flow": "authorization_code",
+    "token_endpoint_auth_method": "client_secret_basic",
+    "redirect_uri_validation": true,
+    "state_parameter_validation": true,
+    "scope_validation": true,
+    "pkce_enabled": true
+  },
+
+  "mfa": {
+   "enabled": true,
+    "methods": ["TOTP"],
+    "enforcement_enabled": false,
+    "required_for_admin": true,
+    "recovery_protection": true,
+    "bypass_protection": true
+  }
+}
