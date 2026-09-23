@@ -1,6 +1,16 @@
 import os
 import warnings
 
+# Corporate networks (e.g. HCL's) intercept outbound TLS with a proxy whose
+# root CA is trusted by Windows but not by Python's bundled certifi CA list,
+# which makes every outbound HTTPS call (including to api.openai.com) fail
+# with CERTIFICATE_VERIFY_FAILED / "Connection error". Injecting truststore
+# makes Python validate certificates against the OS trust store instead, so
+# calls succeed the same way curl/the browser already do on this machine.
+import truststore
+
+truststore.inject_into_ssl()
+
 from dotenv import load_dotenv
 
 # Load environment variables from .env

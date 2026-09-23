@@ -1,14 +1,28 @@
+import sys
+from pathlib import Path
+
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
 
-from Performance_Testing_Agent.config import LITELLM_MODEL_NAME, TEMPERATURE
-from Performance_Testing_Agent.agents.test_execution import test_execution_agent
-from Performance_Testing_Agent.agents.monitoring import monitoring_agent
-from Performance_Testing_Agent.agents.security import security_agent
-from Performance_Testing_Agent.agents.analysis import analysis_agent
-from Performance_Testing_Agent.agents.report import report_agent
+from ..config import LITELLM_MODEL_NAME, TEMPERATURE
+
+# test_execution_agent_adk uses absolute `app.*` imports internally (it's
+# built to run standalone via `adk web`/`adk run` from inside its own
+# folder, which puts that folder on sys.path). Add it here so those
+# internal imports resolve when this package imports it too.
+_ADK_APP_ROOT = Path(__file__).resolve().parents[1] / "agents" / "test_execution_agent_adk"
+if str(_ADK_APP_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ADK_APP_ROOT))
+
+from app.agent import root_agent as test_execution_agent
+
+from ..agents.monitoring import monitoring_agent
+from ..agents.security import security_agent
+from ..agents.analysis import analysis_agent
+from ..agents.report import report_agent
 
 from .prompts import ORCHESTRATOR_SYSTEM_PROMPT
+
 
 
 def build_orchestrator_agent() -> LlmAgent:
