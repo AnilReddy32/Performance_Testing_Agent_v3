@@ -14,10 +14,22 @@ _ADK_APP_ROOT = Path(__file__).resolve().parents[1] / "agents" / "test_execution
 if str(_ADK_APP_ROOT) not in sys.path:
     sys.path.insert(0, str(_ADK_APP_ROOT))
 
+
+
+_SECURITY_ADK_ROOT = Path(__file__).resolve().parents[1] / "agents" / "security_agent_adk"
+if str(_SECURITY_ADK_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SECURITY_ADK_ROOT))
+
 from app.agent import root_agent as test_execution_agent
 
+from security_agent.config import settings
+
+from Performance_Testing_Agent.agents.security_agent_adk.security_agent.agent import root_agent as security_agent
+
+from security_agent.agent import root_agent as security_agent
+
 from ..agents.monitoring import monitoring_agent
-from ..agents.security import security_agent
+# from ..agents.security import security_agent
 from ..agents.analysis import analysis_agent
 from ..agents.report import report_agent
 

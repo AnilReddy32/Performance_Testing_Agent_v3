@@ -4,10 +4,15 @@ __pycache__/
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
 
 # Virtual environments
-.venv
+.venv/
+venv/
 
-#Environment variables
+# Environment variables
 .env
+.env.*
+
+# ADK local data
+.adk/
