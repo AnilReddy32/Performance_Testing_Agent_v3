@@ -28,7 +28,7 @@ from Performance_Testing_Agent.agents.security_agent_adk.security_agent.agent im
 
 from security_agent.agent import root_agent as security_agent
 
-from ..agents.monitoring import monitoring_agent
+from ..agents.monitoring_agent_adk.app.agent import monitoring_agent
 # from ..agents.security import security_agent
 from ..agents.analysis import analysis_agent
 from ..agents.report import report_agent
