@@ -1,0 +1,14 @@
+Incident Postmortem INC-2041: Payments Error Rate Spike
+
+Date: 2026-03-14
+Application: ANZ-Payments
+Summary: During a peak load performance test, POST /payments error rate
+spiked to 4.2%, breaching the 1% SLA threshold. Root cause was a JWT
+validation bug where expired tokens were incorrectly accepted on retried
+requests, causing downstream authorization failures under load.
+
+Resolution: Gateway was patched to reject retried requests carrying expired
+JWTs. Error rate returned to 0.1% in the following test cycle.
+
+Follow-up action: Security Agent should specifically check JWT expiry
+enforcement on retry paths for all payment endpoints going forward.

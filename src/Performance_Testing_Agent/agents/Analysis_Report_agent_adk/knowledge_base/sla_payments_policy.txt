@@ -1,0 +1,17 @@
+Payments API Service Level Agreement
+
+Scope: This SLA applies to all payment-processing APIs under the ANZ-Payments
+application, including POST /payments and related endpoints.
+
+Availability: The service must maintain 99.9% availability measured monthly.
+
+Error Rate: The error rate for POST /payments must not exceed 0.5% under
+peak load conditions. Any run exceeding 1% error rate is classified as an
+SLA breach and requires immediate incident review.
+
+Latency: p95 response time for POST /payments must remain under 500ms under
+peak load. Sustained p95 above 800ms for more than one test cycle should
+trigger a capacity review with the platform team.
+
+Escalation: SLA breaches detected during performance testing must be logged
+as a Jira ticket and reviewed within one business day.
