@@ -12,24 +12,30 @@ from google.adk.tools.mcp_tool.mcp_session_manager import (
  
 from mcp import StdioServerParameters
  
- 
-# ============================================================
-# Project paths
-# ============================================================
- 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
- 
-MONITORING_SERVER = (
-    PROJECT_ROOT
-    / "mcp_server"
-    / "monitoring"
-    / "server.py"
-)
+# Local fallback tool -- no longer wired in below, kept only so you can
+# revert quickly (tools=[collect_monitoring_metrics]) if the MCP
+# connection ever breaks again on this machine.
+#from .local_monitoring_tool import collect_monitoring_metrics
  
  
 # ============================================================
-# Monitoring MCP
+# Monitoring MCP -- this is now the tool actually wired in below.
+# The earlier "Connection closed" error was caused by server.py's
+# `from mcp.server.fastmcp import FastMCP` failing under mcp 2.x
+# (FastMCP was renamed/moved in that release). Pinning the
+# environment to `mcp<2` (mcp==1.30.0) restored the module server.py
+# imports, so the MCP subprocess can now actually start and complete
+# its handshake with ADK.
 # ============================================================
+ 
+MONITORING_SERVER = Path(__file__).resolve().parent / "mcp" / "server.py"
+ 
+if not MONITORING_SERVER.exists():
+    raise FileNotFoundError(
+        f"Monitoring MCP server script not found at: {MONITORING_SERVER}\n"
+        f"(agent.py is at: {Path(__file__).resolve()})\n"
+        "server.py should be a sibling 'mcp' folder next to this file."
+    )
  
 monitoring_mcp = McpToolset(
     connection_params=StdioConnectionParams(
@@ -43,7 +49,9 @@ monitoring_mcp = McpToolset(
  
  
 # ============================================================
-# Monitoring Agent
+# Monitoring Agent -- single agent, MCP tool directly attached,
+# JSON output enforced through instruction (not output_schema,
+# since ADK doesn't allow tools + output_schema on one agent).
 # ============================================================
  
 monitoring_agent = Agent(
@@ -60,73 +68,55 @@ monitoring_agent = Agent(
     instruction="""
 You are the Monitoring Agent of the ANZ Performance Testing system.
  
-IDENTIFICATION (always do this):
-Every single response you produce — including error, "unavailable",
-and clarification responses — must begin with this exact line:
- 
-Monitoring Agent Report
- 
-Never omit this line. It identifies you as the agent that handled
-the request, so it must appear even if the Monitoring MCP server
-returns no data at all.
- 
-WHEN TO USE THE MONITORING MCP (always do this):
-Treat any of the following as a request for monitoring data, and
-in every one of these cases call the Monitoring MCP tool
-immediately, before writing your final answer:
+WHEN TO USE THE MONITORING MCP TOOL (always do this):
+Treat any of the following as a request for monitoring data, and in
+every one of these cases call the Monitoring MCP tool immediately,
+before writing your final answer:
 - Any mention of CPU, memory, database connections, response time,
   API latency, or TPS.
 - Any request to "process", "analyze", "check", "monitor", or
   "identify" a scenario, bottleneck, correlation, or metric.
-- Any request that references "the supplied performance-testing
-  log" or "execution data" — this means data the Monitoring MCP
-  server already has access to for that test run. It does NOT mean
-  the user is going to paste a log into the chat. Never ask the
-  user to upload, paste, or supply a log or metrics yourself — call
-  the Monitoring MCP tool to retrieve them instead.
+- Any request that references "the supplied performance-testing log"
+  or "execution data" -- this means data the MCP server already has
+  access to. Never ask the user to paste or supply a log or metrics
+  yourself -- always call the tool instead.
 - If the MCP tool call itself fails or returns nothing, that is the
-  only time you report values as "Unavailable" — you must still
+  only time you report a metric as unavailable -- you must still
   have attempted the tool call first.
  
 RULES:
-- Always call the Monitoring MCP before answering when monitoring
-  data is requested (see above).
-- Return actual values received from the MCP server.
-- Never invent monitoring values.
-- If a requested metric is not available from the MCP server after
-  calling the tool, clearly say "Unavailable".
-- Do not claim JVM heap utilization exists unless the MCP server
-  actually returns it.
-- Do not claim thread utilization exists unless the MCP server
-  actually returns it.
-- Do not modify MCP results.
+- Return actual values received from the MCP server. Never invent
+  monitoring values.
+- Do not modify the MCP server's results.
  
-OUTPUT FORMAT (always use this, in this order):
+INPUT YOU MAY RECEIVE:
+The incoming message may contain a "Test execution output" JSON
+block with job_id, application, and scenario for this same run.
  
-Monitoring Agent Report
+FINAL OUTPUT FORMAT -- NO EXCEPTIONS:
+Your entire final answer must be exactly ONE JSON object, and
+nothing else -- no markdown fences, no commentary before or after
+it, matching this shape:
  
-Monitoring Results
+{
+  "job_id": "<from the Test execution output block, or \\"unknown\\" if none was given>",
+  "application": "<from the Test execution output block, or \\"unknown\\">",
+  "scenario": "<from the Test execution output block, or \\"unknown\\">",
+  "cpu_usage": <actual number from the MCP server, or 0 if unavailable>,
+  "memory_usage": <actual number from the MCP server, or 0 if unavailable>,
+  "db_connections": <actual number from the MCP server, or 0 if unavailable>,
+  "response_time": <actual number from the MCP server, or 0 if unavailable>,
+  "tps": <actual number from the MCP server, or 0 if unavailable>,
+  "status": "<\\"OK\\" if no alerts, \\"WARNING\\" or \\"CRITICAL\\" mirroring the worst alert from the MCP server, or \\"UNAVAILABLE\\" if any metric could not be retrieved>",
+  "alerts": [<exact alert strings from the MCP server, or an empty list>]
+}
  
-CPU Usage: <actual value>
-Memory Usage: <actual value>
-Database Connections: <actual value>
-Response Time: <actual value>
-TPS: <actual value>
- 
-Alerts:
-<actual alerts>
- 
-If a metric is unavailable, display it as:
- 
-<Metric>: Unavailable
-Reason: <actual reason if provided>
- 
-Do not invent missing values. The "Monitoring Agent Report" header
-is mandatory on every response, with no exceptions.
+Never invent numbers to fill this shape -- if the MCP server didn't
+return a metric, use 0 for that field and set status to
+"UNAVAILABLE" instead.
 """,
  
     tools=[
         monitoring_mcp,
     ],
- 
 )

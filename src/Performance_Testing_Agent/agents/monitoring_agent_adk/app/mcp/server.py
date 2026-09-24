@@ -14,7 +14,7 @@ mcp = FastMCP("Monitoring Performance Server")
 
 # ---------------------------------------------------------
  
-BASE_DIR = Path(__file__).resolve().parents[2]
+BASE_DIR = Path(__file__).resolve().parents[1]
  
 MONITORING_FILE = (
 
