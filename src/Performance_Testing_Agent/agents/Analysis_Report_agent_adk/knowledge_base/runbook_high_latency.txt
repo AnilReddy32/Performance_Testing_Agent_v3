@@ -1,0 +1,17 @@
+Runbook: High Latency on Payments API
+
+Symptom: p95 or max response time on POST /payments is significantly above
+baseline, often with a wide gap between average and p95 (tail latency).
+
+Common causes:
+1. Database connection pool exhaustion under peak concurrency.
+2. Downstream fraud-check service slow responses not being timed out.
+3. JVM garbage collection pauses under memory pressure.
+
+Immediate actions:
+- Check DB connection pool utilization dashboards for saturation.
+- Confirm the fraud-check service client has a strict timeout configured.
+- Review GC logs for long pause events during the test window.
+
+Longer-term fix: add circuit breakers around downstream calls and increase
+DB pool size with load testing to validate the new ceiling.

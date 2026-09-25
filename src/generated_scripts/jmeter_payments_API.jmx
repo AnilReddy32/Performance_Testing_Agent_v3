@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.4.1">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
+      <stringProp name="TestPlan.comments"></stringProp>
+      <boolProp name="TestPlan.user_defined_variables"></boolProp>
+      <elementProp name="TestPlan.userDefinedVariables" elementType="Arguments">
+        <collectionProp name="Arguments.arguments"/>
+      </elementProp>
+      <stringProp name="TestPlan.name">ANZ-Payments Performance Test</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <stringProp name="TestPlan.tearDownOnShutdown">true</stringProp>
+      <stringProp name="TestPlan.userDefinedVariables"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
+        <stringProp name="ThreadGroup.name">Payment Processing Thread Group</stringProp>
+        <elementProp name="ThreadGroup.num_threads" elementType="ThreadGroup.num_threads">10</elementProp>
+        <elementProp name="ThreadGroup.ramp_time" elementType="ThreadGroup.ramp_time">5</elementProp>
+        <elementProp name="ThreadGroup.loop_count" elementType="ThreadGroup.loop_count">1</elementProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+      </ThreadGroup>
+      <hashTree>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Payment API Request" enabled="true">
+          <stringProp name="HTTPSampler.domain">localhost</stringProp>
+          <stringProp name="HTTPSampler.port">80</stringProp>
+          <stringProp name="HTTPSampler.protocol">http</stringProp>
+          <stringProp name="HTTPSampler.path">/api/payments</stringProp>
+          <stringProp name="HTTPSampler.method">POST</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.do_multipart">false</boolProp>
+          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="amount" elementType="Argument">
+                <stringProp name="Argument.name">amount</stringProp>
+                <stringProp name="Argument.value">100.00</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="currency" elementType="Argument">
+                <stringProp name="Argument.name">currency</stringProp>
+                <stringProp name="Argument.value">AUD</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+              <elementProp name="recipient" elementType="Argument">
+                <stringProp name="Argument.name">recipient</stringProp>
+                <stringProp name="Argument.value">recipient@example.com</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+        </HTTPSamplerProxy>
+        <hashTree/>
+      </hashTree>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>

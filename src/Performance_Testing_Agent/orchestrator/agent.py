@@ -87,4 +87,6 @@ def build_orchestrator_agent() -> LlmAgent:
 
 # ADK CLI / dev tooling (e.g. `adk web`, `adk run`) looks for a module-level
 # `root_agent` variable, so it is exposed here as well.
+# root_agent = build_orchestrator_agent()
+
 root_agent = build_orchestrator_agent()

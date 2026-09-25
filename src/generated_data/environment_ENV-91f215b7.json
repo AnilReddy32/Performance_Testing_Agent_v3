@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-91f215b7",
+  "application": "ANZ-Payments",
+  "scenario": "Payment Processing",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-24T15:46:09.640522",
+  "status": "prepared"
+}

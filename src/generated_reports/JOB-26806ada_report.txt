@@ -1,0 +1,10 @@
+Executive Summary
+=================
+Overall Result: PASS
+API: payments API
+
+Performance Findings (Test Execution)
+=====================================
+Status: PASS / low
+avg=465.55ms  p95=744.36ms  max=1035.35ms  throughput=395.96 req/s  error_rate=0.93%  http_status=200
+
