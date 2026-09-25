@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-870ba706",
+  "application": "Internet Banking",
+  "scenario": "Login",
+  "environment": "test",
+  "users": 100,
+  "requirements": "",
+  "prepared_at": "2026-09-25T08:20:47.088623",
+  "status": "prepared"
+}

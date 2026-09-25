@@ -1,5 +1,5 @@
 from typing import Any
-
+from google.adk.tools import ToolContext
 from security_agent.models.assessment import AssessmentState
 from security_agent.security.assessment import (
     add_assessment,
@@ -94,6 +94,7 @@ def record_missing_evidence(
 
 def finalize_assessment(
     state_data: dict[str, Any],
+    tool_context: ToolContext,
 ) -> dict[str, Any]:
     """
     Convert the accumulated assessment state into the
@@ -101,5 +102,10 @@ def finalize_assessment(
     """
 
     state = AssessmentState.model_validate(state_data)
+    result = build_security_response(state).model_dump()
 
-    return build_security_response(state).model_dump()
+    tool_context.state["security_result"] = result
+
+    return result
+
+

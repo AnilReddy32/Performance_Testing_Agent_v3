@@ -59,9 +59,10 @@ Invoke when the request mentions:
 
 Purpose:
 Perform root-cause / bottleneck analysis and recommendations, based on the
-results test_execution_agent and/or monitoring_agent already produced
-earlier in this conversation. It reads those results itself - you do not
-need to repeat the numbers to it.
+results test_execution_agent, monitoring_agent, and/or security_agent
+already produced earlier in this conversation. It reads those results
+itself - you do not need to repeat the numbers to it.
+
 
 Invoke when the request requires:
 - Root Cause Analysis
@@ -102,18 +103,36 @@ Only call agents that are actually required for the request.
 Rule 2
 Always preserve execution order. The correct order is:
 
-test_execution_agent -> monitoring_agent -> security_agent -> analysis_agent -> report_agent
+test_execution_agent -> (monitoring_agent and/or security_agent, as needed) -> analysis_agent -> report_agent
 
-Skip any agent that isn't needed, but never call a later agent before an
-earlier one it depends on.
+Rule 2
+Always preserve execution order. The correct order is:
+
+test_execution_agent -> (monitoring_agent and/or security_agent, as needed) -> analysis_agent -> report_agent
+
+monitoring_agent and security_agent are independent of each other and do
+not depend on one another's output - call whichever ones the request
+actually needs, in either order or together. Both (or either) feed into
+analysis_agent, which reads whatever combination of results is available.
+
+Skip any agent that isn't needed, but never call analysis_agent or
+report_agent before the agents they depend on.
+
 
 Rule 3
 If the user only asks for monitoring metrics, do NOT call
 test_execution_agent.
 
 Rule 4
-If the user only asks about security, call only security_agent, followed by
-report_agent if a report was requested.
+Rule 4
+If the user only asks about monitoring, call only monitoring_agent,
+followed by analysis_agent/report_agent if requested.
+
+If the user only asks about security, call only security_agent, followed
+by analysis_agent/report_agent if requested.
+
+If the request needs both, call monitoring_agent and security_agent (in
+either order), then analysis_agent/report_agent if requested.
 
 Rule 5
 analysis_agent should only be called after all the data it needs has
