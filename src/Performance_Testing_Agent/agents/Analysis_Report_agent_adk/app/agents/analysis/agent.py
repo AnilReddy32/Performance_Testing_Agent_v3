@@ -92,6 +92,7 @@ Rules:
 analysis_agent = Agent(
     name="analysis_agent",
     model=LiteLlm(model="openai/gpt-4.1"),
+    mode="single_turn",
     description=(
         "Validates performance-test data quality and analyzes test "
         "execution metrics, infrastructure health, and security findings "
@@ -110,4 +111,4 @@ analysis_agent = Agent(
     output_key="analysis_result",
 )
 
-root_agent = analysis_agent
+root_agent = analysis_agent()

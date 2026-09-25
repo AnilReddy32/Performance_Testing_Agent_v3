@@ -37,6 +37,7 @@ root_agent = LlmAgent(
     model=LiteLlm(
         model=settings.OPENAI_MODEL,
     ),
+    mode = "single_turn",
     description=(
         "Production-grade Security Agent responsible for "
         "application and API security assessment."

@@ -71,6 +71,7 @@ Rules:
 report_agent = Agent(
     name="report_agent",
     model=LiteLlm(model="openai/gpt-4.1"),
+    mode="single_turn",
     description=(
         "Generates a TXT/PDF performance test report from the Analysis "
         "Agent's structured output, including security recommendations "
