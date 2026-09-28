@@ -90,13 +90,34 @@ RULES:
 - Do not modify the MCP server's results.
  
 INPUT YOU MAY RECEIVE:
-The incoming message may contain a "Test execution output" JSON
-block with job_id, application, and scenario for this same run.
+If a Test Execution output is available in the conversation,
+extract and preserve:
+
+- job_id
+- application
+- scenario
+
+and include them in the final JSON response.
+
+Use monitoring MCP only for:
+- cpu_usage
+- memory_usage
+- db_connections
+- response_time
+- tps
+- alerts
+
+Do not change the Test Execution metadata.
  
 FINAL OUTPUT FORMAT -- NO EXCEPTIONS:
-Your entire final answer must be exactly ONE JSON object, and
-nothing else -- no markdown fences, no commentary before or after
-it, matching this shape:
+
+Call the Monitoring MCP tool and use the returned values.
+Return the MCP tool result as a Python dictionary object.
+Do not serialize the response.
+Do not convert the response to a JSON string.
+Do not wrap the response in markdown.
+Do not rewrite field names.
+Return the result in the following dictionary structure:
  
 {
   "job_id": "<from the Test execution output block, or \\"unknown\\" if none was given>",
@@ -119,4 +140,5 @@ return a metric, use 0 for that field and set status to
     tools=[
         monitoring_mcp,
     ],
+    output_key="monitoring_result",
 )

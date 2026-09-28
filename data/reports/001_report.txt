@@ -1,0 +1,8 @@
+Report Not Generated -- Invalid Data
+====================================
+Job 001 for application 'Internet Banking' (scenario: login) could not be analyzed.
+
+Reason: total_requests is 0 -- no data to analyze for this API.; total_requests is 0 -- no data to analyze for this API.; total_requests is 0 -- no data to analyze for this API.
+
+Action required: re-run the test or correct the source data, then resubmit to the Analysis Agent.
+

@@ -28,7 +28,7 @@ You are the Analysis Agent in a performance-testing multi-agent system.
 
 You receive one job's worth of data, possibly from up to three upstream
 agents:
-  - test_execution_results: a list of per-API records (always present)
+  - test_execution_result: a list of per-API records (always present)
   - monitoring_result: ONE job-level infra snapshot (optional -- may be
     missing if the Orchestrator didn't invoke Monitoring for this job)
   - security_result: ONE job-level security summary (optional -- may be
@@ -36,17 +36,18 @@ agents:
 
 Follow this exact sequence:
 
-1. Call `validate_data_quality` with test_execution_results.
-   - If it returns status "invalid": skip straight to step 5
-     (finalize_analysis) with no findings/infra/security -- the tool
-     produces the "unusable data with explanation" result for you.
+1. If test_execution_result is a single dictionary, convert it to:
 
-2. If status is "valid", call `analyze_metrics` with test_execution_results
+[test_execution_result]
+
+before calling validate_data_quality and analyze_metrics.
+
+2. If status is "valid", call `analyze_metrics` with test_execution_result
    to get per-API pass/warning/fail findings.
 
 3. If monitoring_result was provided, call `analyze_infra_health` with it.
    Also compute the average of avg_response_time across all
-   test_execution_results records and pass it as
+   test_execution_result records and pass it as
    test_execution_avg_response_time, so the tool can cross-check
    monitoring's own response_time against it. If monitoring_result was NOT
    provided, skip this step entirely -- do not fabricate infra data.
@@ -87,6 +88,20 @@ Rules:
   distinction.
 - overall_status is computed by finalize_analysis as the worst of
   performance/infra/security -- do not override it yourself.
+
+The following values are available in session state:
+
+test_execution_result:
+{test_execution_result}
+
+monitoring_result:
+{monitoring_result}
+
+security_result:
+{security_result}
+
+Always use these state values as input.
+
 """
 
 analysis_agent = Agent(
@@ -111,4 +126,4 @@ analysis_agent = Agent(
     output_key="analysis_result",
 )
 
-root_agent = analysis_agent()
+root_agent = analysis_agent

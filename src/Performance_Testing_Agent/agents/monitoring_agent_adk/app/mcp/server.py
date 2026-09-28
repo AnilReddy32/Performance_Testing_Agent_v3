@@ -87,10 +87,15 @@ def read_monitoring_data():
 # Check monitoring
 
 # ---------------------------------------------------------
- 
+print("===== CHECK_MONITORING CALLED =====")
 @mcp.tool()
 
-def check_monitoring() -> dict:
+
+def check_monitoring(
+    job_id: str = "",
+    application: str = "",
+    scenario: str = ""
+) -> dict:
 
     """
 
@@ -134,10 +139,13 @@ def check_monitoring() -> dict:
 # Get monitoring metrics
 
 # ---------------------------------------------------------
- 
+print("===== GET_MONITORING_METRICS CALLED =====")
 @mcp.tool()
-
-def get_monitoring_metrics() -> dict:
+def get_monitoring_metrics(
+    job_id: str = "",
+    application: str = "",
+    scenario: str = ""
+) -> dict:
 
     """
 
@@ -384,6 +392,12 @@ def get_monitoring_metrics() -> dict:
     # ---------------------------------------------
  
     result = {
+
+        "job_id": job_id or "unknown",
+
+        "application": application or "unknown",
+
+        "scenario": scenario or "unknown",
  
         "status": "COMPLETED",
  

@@ -1,0 +1,19 @@
+Executive Summary
+=================
+Overall Result: FAIL
+API: Login
+
+Performance Findings (Test Execution)
+=====================================
+Status: FAIL / high
+avg=176.99ms  p95=234.77ms  max=308.19ms  throughput=374.31 req/s  error_rate=1.36%  http_status=200
+- Error rate 1.36% exceeds 1.0% threshold.
+
+Security Findings (Security Agent)
+==================================
+Status: SecurityStatus.FAIL   Score: 85.71%
+Issues:
+  - MFA enforcement is not enabled.
+Recommendations:
+  - Enable MFA enforcement for users and resources within scope.
+
