@@ -1,0 +1,38 @@
+{
+
+  "id": "TC009",
+
+  "category": "security",
+
+  "scenario": "SQL injection security check",
+
+  "input_type": "user_query",
+
+  "user_query": "Check the application performance testing scenario for potential SQL injection security risks.",
+
+  "expected_agent": "security_agent",
+
+  "expected_tool": "security_analysis",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "security_agent"
+
+  ],
+
+  "expected_result": "The Security Agent should evaluate potential SQL injection risks without claiming a vulnerability unless supported by evidence.",
+
+  "evaluation": {
+
+    "required_agent": "security_agent",
+
+    "required_tool": "security_analysis",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

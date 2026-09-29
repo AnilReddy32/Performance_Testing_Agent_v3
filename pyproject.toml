@@ -15,7 +15,7 @@ dependencies = [
     "litellm>=1.55.0",
     "openai>=1.60.0",
     "httpx>=0.28.1",
-    "mcp>=2.0.0",
+    "mcp<2",  # monitoring_agent's MCP server uses the v1 FastMCP API (mcp.server.fastmcp.FastMCP), which was renamed/removed in mcp 2.x
     "numpy>=2.5.1",
     "pandas>=3.0.5",
     "pydantic>=2.13.4",

@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-07495850",
+  "application": "Core Banking",
+  "scenario": "Core Banking Transactions",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T09:06:38.472556",
+  "status": "prepared"
+}

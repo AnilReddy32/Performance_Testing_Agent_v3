@@ -1,0 +1,19 @@
+{
+  "id": "TC030",
+  "category": "test_execution",
+  "agent": "test_execution_agent",
+  "scenario": "missing users",
+  "input_type": "user_query",
+  "user_query": "Process the missing users scenario",
+  "expected_tool": "run_jmeter_test",
+  "expected_agent_flow": [
+    "test_execution_agent"
+  ],
+  "expected_result": "Use the supplied log evidence, preserve MOCK status, and never invent unavailable metrics.",
+  "evaluation": {
+    "required_agent": "test_execution_agent",
+    "required_tool": "run_jmeter_test",
+    "must_not_hallucinate": true,
+    "must_preserve_execution_mode": true
+  }
+}

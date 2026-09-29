@@ -1,0 +1,14 @@
+{
+  "benchmark_name": "ANZ Banking AI Performance Testing Benchmark",
+  "version": "1.0",
+  "input_type": "log",
+  "total_cases": 100,
+  "categories": {
+    "test_execution": 23,
+    "monitoring": 18,
+    "security": 18,
+    "analysis": 18,
+    "reporting": 13,
+    "orchestration": 10
+  }
+}

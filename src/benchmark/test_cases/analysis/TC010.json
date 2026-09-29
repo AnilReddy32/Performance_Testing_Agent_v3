@@ -1,0 +1,38 @@
+{
+
+  "id": "TC010",
+
+  "category": "analysis",
+
+  "scenario": "Average latency analysis",
+   
+  "input_type": "user_query",
+
+  "user_query": "What is the average latency?",
+
+  "expected_agent": "analysis_agent",
+
+  "expected_tool": "analysis",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "analysis_agent"
+
+  ],
+
+  "expected_result": "The Analysis Agent should provide the average latency when valid performance data is available and should not invent a latency value when data is unavailable.",
+
+  "evaluation": {
+
+    "required_agent": "analysis_agent",
+
+    "required_tool": "analysis",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

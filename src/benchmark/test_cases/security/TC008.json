@@ -1,0 +1,38 @@
+{
+
+  "id": "TC008",
+
+  "category": "security",
+
+  "scenario": "Authorization security check",
+
+  "input_type": "user_query",
+
+  "user_query": "Analyze the performance testing scenario for authorization and access-control issues.",
+
+  "expected_agent": "security_agent",
+
+  "expected_tool": "security_analysis",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "security_agent"
+
+  ],
+
+  "expected_result": "The Security Agent should analyze authorization and access-control concerns based on available evidence.",
+
+  "evaluation": {
+
+    "required_agent": "security_agent",
+
+    "required_tool": "security_analysis",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

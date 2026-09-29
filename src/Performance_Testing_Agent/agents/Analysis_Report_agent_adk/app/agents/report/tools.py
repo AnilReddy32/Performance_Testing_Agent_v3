@@ -1,19 +1,49 @@
 """
 Tools for the Report Agent.
 
-Updated to render THREE dimensions from AnalysisOutput: per-API performance
+Renders THREE dimensions from AnalysisOutput: per-API performance
 findings (api_findings), infra health (infra_health, from monitoring_agent),
 and security (security_summary, from security_agent, passed through mostly
 as-is since security_agent already did the judging).
+
+CHANGE (this version): render_txt_report / render_pdf_report always write
+the real file to local disk (REPORTS_DIR, e.g. "data/reports/JOB-123_report.pdf")
+FIRST - that write always happens and is never skipped. Registering the
+same file as an ADK artifact (for a clickable download in the ADK web
+UI) is now a best-effort SECOND step wrapped in try/except: if it fails
+(e.g. Windows' 260-character path limit inside ADK's file-based artifact
+service - see WinError 206 in earlier logs), that failure is caught and
+logged, and the function still returns successfully with the local path.
+This guarantees a real PDF/TXT file always ends up in the project folder
+regardless of whether the artifact-storage backend cooperates on this
+machine.
 """
 
+import logging
 import os
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List, Optional
+
+from google.adk.tools import ToolContext
+from google.genai import types as genai_types
 
 from .schemas import ReportOutput, ReportSection
 
-REPORTS_DIR = os.environ.get("REPORTS_DIR", "data/reports")
+logger = logging.getLogger(__name__)
+
+# Anchored to this file's own location, not the current working directory -
+# a bare relative "data/reports" resolves differently depending on whether
+# adk web was launched from the project root or from src/. Anchoring one
+# level higher (to src/) keeps reports inside src/data/reports, matching
+# where the project already expects them. Walking up from this file
+# (report/tools.py) to src/:
+#   report -> agents -> app -> Analysis_Report_agent_adk -> agents
+#   -> Performance_Testing_Agent -> src
+_SRC_ROOT = Path(__file__).resolve().parents[6]
+_DEFAULT_REPORTS_DIR = str(_SRC_ROOT / "data" / "reports")
+
+REPORTS_DIR = os.environ.get("REPORTS_DIR", _DEFAULT_REPORTS_DIR)
 
 
 def build_report_sections(
@@ -61,7 +91,8 @@ def build_report_sections(
         for f in api_findings:
             m = f.get("metrics", {})
             lines.append(
-                f"- {f['api_name']} [{f['status'].upper()} / {f['severity']}]\n"
+                f"- {f.get('api_name', 'Unknown API')} "
+                f"[{str(f.get('status', 'unknown')).upper()} / {f.get('severity', 'unknown')}]\n"
                 f"    avg={m.get('avg_response_time')}ms  "
                 f"p95={m.get('p95_response_time')}ms  "
                 f"max={m.get('max_response_time')}ms  "
@@ -115,7 +146,7 @@ def build_report_sections(
         sections.append({"title": "Security Findings (Security Agent)", "content": "\n".join(lines)})
 
     fail_or_warn = [f for f in api_findings if f.get("status") in ("fail", "warning")]
-    next_steps = [f"- {f['api_name']}: {f.get('recommendation') or 'Investigate flagged anomalies above.'}"
+    next_steps = [f"- {f.get('api_name', 'Unknown API')}: {f.get('recommendation') or 'Investigate flagged anomalies above.'}"
                   for f in fail_or_warn]
     if infra_health and infra_health.get("status") in ("fail", "warning"):
         next_steps.append("- Infrastructure: review CPU/memory/DB connection anomalies above.")
@@ -130,26 +161,65 @@ def build_report_sections(
     return {"sections": sections, "rejected": False}
 
 
-def render_txt_report(job_id: str, sections: List[dict]) -> str:
+async def _save_artifact_best_effort(
+    tool_context: ToolContext,
+    artifact_filename: str,
+    data: bytes,
+    mime_type: str,
+) -> bool:
+    """Tries to register a file as a real downloadable ADK artifact.
+    Returns True on success, False on any failure (logged, never raised) -
+    e.g. Windows path-length limits inside ADK's file-based artifact
+    service. The caller always has the local disk file regardless of
+    what this returns."""
+    try:
+        part = genai_types.Part.from_bytes(data=data, mime_type=mime_type)
+        await tool_context.save_artifact(filename=artifact_filename, artifact=part)
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "Could not register '%s' as an ADK artifact (%s: %s) - the "
+            "file was still written to local disk in %s and remains "
+            "available there.",
+            artifact_filename, e.__class__.__name__, e, REPORTS_DIR,
+        )
+        return False
+
+
+async def render_txt_report(job_id: str, sections: List[dict], tool_context: ToolContext) -> str:
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    path = os.path.join(REPORTS_DIR, f"{job_id}_report.txt")
-    with open(path, "w", encoding="utf-8") as f:
-        for s in sections:
-            f.write(f"{s['title']}\n{'=' * len(s['title'])}\n{s['content']}\n\n")
-    return path
+    local_path = os.path.join(REPORTS_DIR, f"{job_id}_report.txt")
+    text = ""
+    for s in sections:
+        text += f"{s['title']}\n{'=' * len(s['title'])}\n{s['content']}\n\n"
+
+    # Local file is always written first - this is the guaranteed deliverable.
+    with open(local_path, "w", encoding="utf-8") as f:
+        f.write(text)
+
+    artifact_filename = f"{job_id}_report.txt"
+    saved = await _save_artifact_best_effort(
+        tool_context, artifact_filename, text.encode("utf-8"), "text/plain"
+    )
+
+    # If the artifact registration failed, report the real local path
+    # instead of an artifact filename that doesn't actually exist as a
+    # download - the caller should always get something that genuinely
+    # points at a file that exists.
+    return artifact_filename if saved else local_path
 
 
-def render_pdf_report(job_id: str, sections: List[dict]) -> str:
+async def render_pdf_report(job_id: str, sections: List[dict], tool_context: ToolContext) -> str:
     from reportlab.lib.pagesizes import LETTER
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib.units import inch
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    path = os.path.join(REPORTS_DIR, f"{job_id}_report.pdf")
+    local_path = os.path.join(REPORTS_DIR, f"{job_id}_report.pdf")
 
     styles = getSampleStyleSheet()
-    doc = SimpleDocTemplate(path, pagesize=LETTER,
+    doc = SimpleDocTemplate(local_path, pagesize=LETTER,
                              topMargin=0.75 * inch, bottomMargin=0.75 * inch)
     story = []
     for s in sections:
@@ -157,8 +227,19 @@ def render_pdf_report(job_id: str, sections: List[dict]) -> str:
         for line in s["content"].split("\n"):
             story.append(Paragraph(line if line.strip() else "&nbsp;", styles["Normal"]))
         story.append(Spacer(1, 0.2 * inch))
+
+    # Local PDF is always written first - this is the guaranteed deliverable.
     doc.build(story)
-    return path
+
+    with open(local_path, "rb") as f:
+        pdf_bytes = f.read()
+
+    artifact_filename = f"{job_id}_report.pdf"
+    saved = await _save_artifact_best_effort(
+        tool_context, artifact_filename, pdf_bytes, "application/pdf"
+    )
+
+    return artifact_filename if saved else local_path
 
 
 def ingest_report_to_knowledge_base(analysis_result: dict) -> dict:
@@ -173,24 +254,40 @@ def ingest_report_to_knowledge_base(analysis_result: dict) -> dict:
         return {"knowledge_base_updated": False, "error": str(e)}
 
 
-def finalize_report(
+async def finalize_report(
     job_id: str,
     application: str,
     scenario: str,
     overall_status: Optional[str],
     sections: List[dict],
     rejected: bool,
+    tool_context: ToolContext,
     requested_format: str = "pdf",
 ) -> dict:
     """Renders the requested file format(s) and returns a validated
-    ReportOutput dict. Call last."""
+    ReportOutput dict. Call last.
+
+    file_path holds either the ARTIFACT'S filename (e.g.
+    "JOB-123_report.pdf", downloadable from the ADK web UI's Artifacts
+    panel) if artifact registration succeeded, or the real local disk
+    path (e.g. "data/reports/JOB-123_report.pdf") if it didn't - either
+    way it points at a file that actually exists.
+    """
+    # Guard against an empty/missing job_id (e.g. a rejected/invalid-data
+    # report with no real job to attach to) - without this, the artifact
+    # filename becomes a bare "_report.txt"/"_report.pdf" (leading
+    # underscore, no id), which is a degenerate filename some artifact
+    # storage backends choke on.
+    if not job_id:
+        job_id = f"UNKNOWN-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+
     fmt = "txt" if rejected else requested_format
     file_path = None
 
     if fmt in ("txt", "both"):
-        file_path = render_txt_report(job_id, sections)
+        file_path = await render_txt_report(job_id, sections, tool_context)
     if fmt in ("pdf", "both") and not rejected:
-        file_path = render_pdf_report(job_id, sections)
+        file_path = await render_pdf_report(job_id, sections, tool_context)
 
     output = ReportOutput(
         job_id=job_id, application=application, scenario=scenario,

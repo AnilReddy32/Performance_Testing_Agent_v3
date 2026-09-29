@@ -1,0 +1,19 @@
+{
+  "id": "TC021",
+  "category": "test_execution",
+  "agent": "test_execution_agent",
+  "scenario": "JMeter 10000 users",
+  "input_type": "user_query",
+  "user_query": "Perform bulk transaction simulation with JMeter tool for 200 users for 200 seconds. ",
+  "expected_tool": "run_jmeter_test",
+  "expected_agent_flow": [
+    "test_execution_agent"
+  ],
+  "expected_result": "Use the supplied log evidence, preserve MOCK status, and never invent unavailable metrics.",
+  "evaluation": {
+    "required_agent": "test_execution_agent",
+    "required_tool": "run_jmeter_test",
+    "must_not_hallucinate": true,
+    "must_preserve_execution_mode": true
+  }
+}

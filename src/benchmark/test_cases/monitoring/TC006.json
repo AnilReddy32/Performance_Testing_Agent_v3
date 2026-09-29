@@ -1,0 +1,38 @@
+{
+
+  "id": "TC006",
+
+  "category": "monitoring",
+
+  "scenario": "Analyze latency and resource correlation",
+
+  "input_type": "user_query",
+
+  "user_query": "Check whether high API latency is correlated with CPU or memory utilization during the performance test.",
+
+  "expected_agent": "monitoring_agent",
+
+  "expected_tool": "monitoring",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "monitoring_agent"
+
+  ],
+
+  "expected_result": "The Monitoring Agent should analyze the available metrics and describe any supported correlation without inventing measurements.",
+
+  "evaluation": {
+
+    "required_agent": "monitoring_agent",
+
+    "required_tool": "monitoring",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

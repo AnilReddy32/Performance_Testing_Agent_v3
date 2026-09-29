@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-597f0f08",
+  "application": "Internet Banking",
+  "scenario": "Fund Transfer",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T04:36:54.393995",
+  "status": "prepared"
+}

@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-93c2b87b",
+  "application": "payments application",
+  "scenario": "Payment Processing",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T10:53:24.425348",
+  "status": "prepared"
+}

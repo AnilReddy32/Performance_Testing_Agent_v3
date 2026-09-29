@@ -1,0 +1,38 @@
+{
+
+  "id": "TC014",
+
+  "category": "reporting",
+
+  "scenario": "Performance findings report",
+
+  "input_type": "user_query",
+
+  "user_query": "Create a report containing the key performance findings, SLA status, bottlenecks, and recommendations.",
+
+  "expected_agent": "report_agent",
+
+  "expected_tool": "report",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "report_agent"
+
+  ],
+
+  "expected_result": "The Report Agent should produce a report containing supported findings, SLA status, bottlenecks, and recommendations.",
+
+  "evaluation": {
+
+    "required_agent": "report_agent",
+
+    "required_tool": "report",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

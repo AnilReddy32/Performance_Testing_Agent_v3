@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-f7d7ba7b",
+  "application": "EOD Batch Processing System",
+  "scenario": "EOD Batch Processing",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T04:59:39.503959",
+  "status": "prepared"
+}

@@ -1,0 +1,38 @@
+{
+
+  "id": "TC011",
+
+  "category": "analysis",
+
+  "scenario": "P95 latency analysis",
+
+  "input_type": "user_query",
+
+  "user_query": "Analyze the P95 response time and determine whether it meets the performance SLA.",
+
+  "expected_agent": "analysis_agent",
+
+  "expected_tool": "analysis",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "analysis_agent"
+
+  ],
+
+  "expected_result": "The Analysis Agent should compare the available P95 response time against the applicable SLA and explain the result using evidence.",
+
+  "evaluation": {
+
+    "required_agent": "analysis_agent",
+
+    "required_tool": "analysis",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

@@ -3,6 +3,8 @@ import csv
 from pathlib import Path
  
 from mcp.server.fastmcp import FastMCP
+
+from datetime import datetime, timezone
  
  
 mcp = FastMCP("Monitoring Performance Server")
@@ -152,6 +154,18 @@ def get_monitoring_metrics(
     Analyze the existing monitoring.csv file.
 
     """
+
+    # Auto-generate a job_id/scenario when this was called standalone (no
+    # Test Execution context to inherit job_id/scenario from) - done here
+    # in code, deterministically, rather than left to the LLM to invent a
+    # timestamp itself.
+    if not job_id:
+
+        job_id = f"MON-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+
+    if not scenario:
+
+        scenario = "Standalone Monitoring Check"
  
     rows = read_monitoring_data()
  
@@ -393,11 +407,11 @@ def get_monitoring_metrics(
  
     result = {
 
-        "job_id": job_id or "unknown",
+        "job_id": job_id,
 
         "application": application or "unknown",
 
-        "scenario": scenario or "unknown",
+        "scenario": scenario,
  
         "status": "COMPLETED",
  
