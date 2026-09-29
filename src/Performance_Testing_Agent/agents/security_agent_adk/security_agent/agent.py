@@ -3,6 +3,7 @@ from pathlib import Path
 from google.adk.agents import LlmAgent
 from google.adk.apps import App
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.tools import AgentTool
 
 from security_agent.config import settings
 from security_agent.tools.api_tool import get_api_information
@@ -32,15 +33,30 @@ if not settings.OPENAI_MODEL:
     )
 
 
-root_agent = LlmAgent(
-    name="security_agent",
+# All 16 security tools live on this sub-agent instead of on root_agent
+# directly. It is wrapped with AgentTool below (not registered via
+# sub_agents=[...]), so it shows up in the adk web agent graph as a single
+# node instead of expanding into all 16 underlying tools. AgentTool runs it
+# through its own nested Runner/session, but forwards every state delta
+# from the nested run back onto the caller's real session (see
+# AgentTool.run_async's "Forward state delta to parent session" step), so
+# tool_context.state writes such as finalize_assessment's security_result
+# still land on the real session exactly as before.
+#
+# mode='chat' is required here (not 'single_turn'): AgentTool runs this
+# agent as the root of its own nested Runner, and Runner.run_async only
+# accepts a directly-run LlmAgent whose mode is 'chat' or 'task'.
+security_operations_agent = LlmAgent(
+    name="security_operations_agent",
     model=LiteLlm(
         model=settings.OPENAI_MODEL,
     ),
-    mode = "single_turn",
+    mode="chat",
     description=(
-        "Production-grade Security Agent responsible for "
-        "application and API security assessment."
+        "Runs the full application and API security assessment workflow "
+        "(evidence retrieval, deterministic validators, and assessment "
+        "state finalization) for the given security objective and returns "
+        "the structured SecurityResponse."
     ),
     instruction=load_security_skill(),
     tools=[
@@ -64,6 +80,26 @@ root_agent = LlmAgent(
         record_missing_evidence,
         finalize_assessment,
     ],
+)
+
+
+root_agent = LlmAgent(
+    name="security_agent",
+    model=LiteLlm(
+        model=settings.OPENAI_MODEL,
+    ),
+    mode = "single_turn",
+    description=(
+        "Production-grade Security Agent responsible for "
+        "application and API security assessment."
+    ),
+    instruction=(
+        "Forward the incoming security objective verbatim to the "
+        "`security_operations_agent` tool and return its result exactly "
+        "as received, with no modification, reformatting, summarization, "
+        "or added commentary. Do not call any other tool."
+    ),
+    tools=[AgentTool(agent=security_operations_agent)],
 )
 
 

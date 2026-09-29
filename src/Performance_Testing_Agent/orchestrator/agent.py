@@ -22,8 +22,6 @@ if str(_SECURITY_ADK_ROOT) not in sys.path:
 
 from app.agent import root_agent as test_execution_agent
 
-from security_agent.config import settings
-
 from Performance_Testing_Agent.agents.security_agent_adk.security_agent.agent import root_agent as security_agent
 
 from security_agent.agent import root_agent as security_agent
