@@ -1,0 +1,24 @@
+{
+  "id": "TC098",
+  "category": "orchestration",
+  "agent": "ANZ_Performance_Testing_Agents",
+  "scenario": "execution ID propagation",
+  "input_type": "user_query",
+  "user_query": "Process the execution ID propagation scenario using the supplied performance-testing log.",
+  "expected_tool": "multi_agent",
+  "expected_agent_flow": [
+    "ANZ_Performance_Testing_Agents",
+    "test_execution_agent",
+    "monitoring_agent",
+    "security_agent",
+    "analysis_agent",
+    "report_agent"
+  ],
+  "expected_result": "Use the supplied log evidence, preserve MOCK status, and never invent unavailable metrics.",
+  "evaluation": {
+    "required_agent": "ANZ_Performance_Testing_Agents",
+    "required_tool": "multi_agent",
+    "must_not_hallucinate": true,
+    "must_preserve_execution_mode": true
+  }
+}

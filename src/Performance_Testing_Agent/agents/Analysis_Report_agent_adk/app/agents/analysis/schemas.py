@@ -74,7 +74,7 @@ class AnalysisInput(BaseModel):
     job_id: str
     application: str
     scenario: str
-    test_execution_results: List[MetricRecord]
+    test_execution_result: MetricRecord
     monitoring_result: Optional[MonitoringResult] = None
     security_result: Optional[SecurityResult] = None
 

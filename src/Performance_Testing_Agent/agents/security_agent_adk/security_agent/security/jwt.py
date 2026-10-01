@@ -6,7 +6,7 @@ def validate_jwt(
 ) -> dict[str, Any]:
     """
     Validate JWT security configuration.
-
+    
     The function evaluates JWT-related configuration using the
     evidence supplied by the application profile.
 

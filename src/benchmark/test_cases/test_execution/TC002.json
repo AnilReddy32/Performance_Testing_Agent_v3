@@ -1,0 +1,41 @@
+{
+
+  "id": "TC002",
+
+  "category": "test_execution",
+
+  "scenario": "Payment API load test",
+  "input_type": "user_query",
+  
+  "user_query": "Run a payment API load test using JMeter with 500 virtual users for 120 seconds.",
+
+  "expected_agent": "test_execution_agent",
+
+  "expected_tool": "run_jmeter_test",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "test_execution_agent",
+
+    "jmeter_mcp",
+
+    "run_jmeter_test"
+
+  ],
+
+  "expected_result": "The Test Execution Agent should execute the JMeter test with the requested virtual users and duration and return the execution result.",
+
+  "evaluation": {
+
+    "required_agent": "test_execution_agent",
+
+    "required_tool": "run_jmeter_test",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

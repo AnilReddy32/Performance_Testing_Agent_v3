@@ -1,0 +1,38 @@
+{
+
+  "id": "TC004",
+
+  "category": "monitoring",
+
+  "scenario": "Monitor system resources during login load test",
+
+  "input_type": "user_query",
+
+  "user_query": "Monitor CPU, memory, database connections, API latency, and TPS during the login load test.",
+
+  "expected_agent": "monitoring_agent",
+
+  "expected_tool": "monitoring",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "monitoring_agent"
+
+  ],
+
+  "expected_result": "The Monitoring Agent should collect or report the requested performance monitoring metrics.",
+
+  "evaluation": {
+
+    "required_agent": "monitoring_agent",
+
+    "required_tool": "monitoring",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

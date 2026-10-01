@@ -1,0 +1,27 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>ANZ Performance Testing Benchmark</title>
+<style>
+body{font-family:Arial;background:#f5f6f8;margin:28px;color:#202124}.wrap{max-width:1400px;margin:auto}
+.cards{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}.card,.panel{background:white;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-top:16px}
+.card b{font-size:22px;display:block}.card span{font-size:11px;color:#6b7280}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:9px;border-bottom:1px solid #eee;text-align:left}
+th{background:#fafafa}.pass{color:#188038;font-weight:bold}.fail{color:#d93025;font-weight:bold}
+</style></head><body><div class="wrap"><h1>ANZ Performance Testing Benchmark Report</h1>
+<p>Generated from benchmark_results.json</p><div class="cards">
+<div class="card"><b id=c>0</b><span>Cases</span></div><div class="card"><b id=a>0</b><span>Attempts</span></div>
+<div class="card"><b id=r>0%</b><span>Pass rate</span></div><div class="card"><b id=p>0%</b><span>Pass@k</span></div>
+<div class="card"><b id=f>0</b><span>Failed</span></div><div class="card"><b id=i>3</b><span>Iterations / case</span></div><div class="card"><b id=h>0%</b><span>Hallucination Rate</span></div>
+</div><div class=panel><h3>Category breakdown</h3><table><thead><tr><th>Category</th><th>Cases</th><th>Pass</th><th>Fail</th><th>Pass Rate</th></tr></thead><tbody id=cat></tbody></table></div>
+<div class=panel><h3>Per-case detail</h3><table><thead><tr><th>ID</th><th>Category</th><th>Scenario</th><th>Attempts</th><th>Status</th><th>Pass@k</th><th>Score</th></tr></thead><tbody id=rows></tbody></table></div>
+</div><script>
+fetch("benchmark_results.json").then(r=>r.json()).then(d=>{
+let x=d.cases||[], ex=x.filter(v=>v.final_status==="PASS"||v.final_status==="FAIL"), pass=ex.filter(v=>v.final_status==="PASS");
+c.textContent=x.length;a.textContent=ex.reduce((s,v)=>s+(v.total_attempts||0),0);
+r.textContent=(ex.length?pass.length/ex.length*100:0).toFixed(1)+"%";p.textContent=(ex.length?ex.filter(v=>v.pass_at_k).length/ex.length*100:0).toFixed(1)+"%";f.textContent=ex.length-pass.length;
+let hallCount=ex.filter(v=>{let atts=v.attempts||[];let last=atts[atts.length-1];return last&&last.evaluation&&last.evaluation.checks&&last.evaluation.checks.no_hallucination===false;}).length;
+h.textContent=(ex.length?hallCount/ex.length*100:0).toFixed(1)+"%";
+let g={};x.forEach(v=>(g[v.category]??=[]).push(v));
+cat.innerHTML=Object.entries(g).map(([k,v])=>{let e=v.filter(z=>z.final_status==="PASS"||z.final_status==="FAIL"),q=e.filter(z=>z.final_status==="PASS").length;return `<tr><td>${k}</td><td>${v.length}</td><td>${q}</td><td>${e.length-q}</td><td>${e.length?(q/e.length*100).toFixed(1):0}%</td></tr>`}).join("");
+rows.innerHTML=x.map(v=>`<tr><td>${v.id}</td><td>${v.category}</td><td>${v.scenario}</td><td>${v.total_attempts||"-"}</td><td class="${v.final_status==="PASS"?"pass":"fail"}">${v.final_status}</td><td>${v.pass_at_k?"100%":"0%"}</td><td>${v.final_score??"-"}</td></tr>`).join("");
+}).catch(()=>{});
+</script></body></html>
