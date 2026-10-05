@@ -178,10 +178,19 @@ def run_execution_workflow(
     # Existing Analysis Agent handoff
     # ---------------------------------------------------------
 
-    analysis_handoff = prepare_analysis_handoff(
-        standardized_result
-    )
+    try:
+        analysis_handoff = prepare_analysis_handoff(
+            standardized_result
+        )
+    except ValueError as exc:
+        return {
+            "status": "error",
+            "message": f"Analysis handoff validation failed: {exc}",
+            "workflow_steps": workflow_steps,
+            "standardized_result": standardized_result,
+        }
 
     workflow_steps.append("analysis_handoff_ready")
 
     return analysis_handoff
+

@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.4.1">
+<jmeterTestPlan version="1.2" properties="5.4.1" jmeter="5.4.1">
   <hashTree>
-    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Internet Banking Test Plan" enabled="true">
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="Test Plan" enabled="true">
       <stringProp name="TestPlan.comments"></stringProp>
       <boolProp name="TestPlan.user_defined_variables"></boolProp>
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments">
         <collectionProp name="Arguments.arguments"/>
       </elementProp>
-      <stringProp name="TestPlan.functional_mode">false</stringProp>
-      <stringProp name="TestPlan.tearDown_on_shutdown">true</stringProp>
-      <stringProp name="TestPlan.serialize_threadgroups">false</stringProp>
+      <stringProp name="TestPlan.name">API Performance Test</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDownOnShutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
     </TestPlan>
     <hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
@@ -19,38 +20,20 @@
         <elementProp name="ThreadGroup.scheduler" elementType="Scheduler">
           <boolProp name="ThreadGroup.scheduler">false</boolProp>
         </elementProp>
-        <stringProp name="ThreadGroup.delay">0</stringProp>
-        <stringProp name="ThreadGroup.duration">0</stringProp>
-        <stringProp name="ThreadGroup.end_time">0</stringProp>
-        <stringProp name="ThreadGroup.start_time">0</stringProp>
-        <stringProp name="ThreadGroup.seconds_to_wait">0</stringProp>
+        <stringProp name="ThreadGroup.name">User Threads</stringProp>
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
       </ThreadGroup>
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="API Request" enabled="true">
           <stringProp name="HTTPSampler.domain">localhost</stringProp>
           <stringProp name="HTTPSampler.port">80</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
-          <stringProp name="HTTPSampler.path">/api/v1/transaction</stringProp>
+          <stringProp name="HTTPSampler.path">/api/test</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.do_multipart">false</boolProp>
-          <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="param1" elementType="HTTPArgument">
-                <stringProp name="Argument.name">accountNumber</stringProp>
-                <stringProp name="Argument.value">${accountNumber}</stringProp>
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-              </elementProp>
-              <elementProp name="param2" elementType="HTTPArgument">
-                <stringProp name="Argument.name">amount</stringProp>
-                <stringProp name="Argument.value">${amount}</stringProp>
-                <boolProp name="HTTPArgument.always_encode">false</boolProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
+          <boolProp name="HTTPSampler.do_gzip">false</boolProp>
         </HTTPSamplerProxy>
         <hashTree/>
       </hashTree>

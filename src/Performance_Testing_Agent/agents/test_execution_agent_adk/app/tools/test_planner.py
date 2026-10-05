@@ -144,7 +144,7 @@ Rules:
    "jmeter"
 
 4. application:
-   Identify the application or system being tested.
+   Identify the application or system being tested. If not mentioned use unknown.
 
    For example:
    "Internet Banking"

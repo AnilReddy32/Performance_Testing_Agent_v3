@@ -5,6 +5,8 @@ build/
 dist/
 wheels/
 *.egg-info/
+generated_scripts/
+generated_data/
 
 # Virtual environments
 .venv/
