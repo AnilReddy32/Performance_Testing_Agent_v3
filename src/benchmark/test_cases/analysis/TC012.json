@@ -1,0 +1,19 @@
+{
+  "id": "TC012",
+  "category": "analysis",
+  "scenario": "Historical performance comparison",
+  "input_type": "user_query",
+  "user_query": "Compare the current performance results with the historical baseline and identify any regression.",
+  "expected_agent": "analysis_agent",
+  "expected_tool": "historical_comparison",
+  "expected_agent_flow": [
+    "root_agent",
+    "analysis_agent"
+  ],
+  "expected_result": "The Analysis Agent should compare current and historical performance data when both are available and identify supported performance changes.",
+  "evaluation": {
+    "required_agent": "analysis_agent",
+    "required_tool": "historical_comparison",
+    "must_not_hallucinate": true
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "benchmark": "ANZ Banking AI Performance Testing Benchmark",
+  "generated_at": "2026-09-18T10:52:37.664289+00:00",
+  "input_type": "user_query",
+  "cases": [
+    {
+      "id": "TC092",
+      "category": "orchestration",
+      "scenario": "E2E payment",
+      "user_query": "Process the E2E payment scenario using the supplied performance-testing log.",
+      "expected_agent": "ANZ_Performance_Testing_Agents",
+      "expected_tool": "multi_agent",
+      "iterations_requested": 3,
+      "retries_requested": 2,
+      "total_attempts": 5,
+      "pass_at_k": false,
+      "final_status": "FAIL",
+      "final_score": 0.0,
+      "attempts": [
+        {
+          "attempt": 1,
+          "attempt_type": "iteration",
+          "iteration": 1,
+          "retry": 0,
+          "execution": {
+            "return_code": 0,
+            "output": "To proceed with performance analysis of the E2E payment scenario, please supply the relevant performance-testing log (containing response times, SLA references, error rates, and resource utilization if available).\n\nOnce the log is provided, I'll:\n\n- Compare against best-practice SLAs (e.g., P95 under 1000 ms, error rate below 2%, CPU under 85%, memory under 80%)\n- Identify any breaches\n- Compare with historical ranges (recent P95: 760-900 ms)\n- Highlight findings and recommendations\n\nPlease provide the log for detailed analysis.",
+            "duration_seconds": 17.284
+          },
+          "evaluation": {
+            "passed": false,
+            "checks": {
+              "agent": false,
+              "tool": false,
+              "mock_status": false
+            },
+            "score": 0.0
+          }
+        },
+        {
+          "attempt": 2,
+          "attempt_type": "iteration",
+          "iteration": 2,
+          "retry": 0,
+          "execution": {
+            "return_code": 0,
+            "output": "To proceed with the E2E payment scenario analysis, I require the performance-testing log or its execution/monitoring data. Please provide the log or its relevant execution and monitoring metrics for analysis against the following best practices and SLAs:\n\n- P95 response time SLA: under 1000 ms\n- Error-rate SLA: below 2%\n- CPU warning threshold: 85%\n- Memory warning threshold: 80%\n- Historical comparison benchmarks: P95 typically 760-900 ms; TPS (transactions/sec) 180-223\n\nShare the performance-testing log or its structured data to continue with detailed SLA, findings, and recommendation analysis.",
+            "duration_seconds": 18.25
+          },
+          "evaluation": {
+            "passed": false,
+            "checks": {
+              "agent": false,
+              "tool": false,
+              "mock_status": false
+            },
+            "score": 0.0
+          }
+        },
+        {
+          "attempt": 3,
+          "attempt_type": "iteration",
+          "iteration": 3,
+          "retry": 0,
+          "execution": {
+            "return_code": 0,
+            "output": "To process the E2E payment scenario using your supplied performance-testing log, I will require the actual log data containing execution (response time, error rate, etc.) and relevant monitoring (CPU, memory, etc.) information. \n\nBased on the available knowledge:\n\n- SLA Targets:\n  - P95 response time: < 1000 ms\n  - Error rate: < 2%\n  - CPU warning threshold: 85%\n  - Memory warning threshold: 80%\n- Historical reference:\n  - Throughput: 180-223 TPS\n  - P95 response time: 760-900 ms\n\nPlease upload or paste your performance-testing log. After receiving this data, I can perform SLA analysis, offer findings, provide historical comparison, and issue recommendations for the E2E payment scenario.",
+            "duration_seconds": 18.502
+          },
+          "evaluation": {
+            "passed": false,
+            "checks": {
+              "agent": false,
+              "tool": false,
+              "mock_status": false
+            },
+            "score": 0.0
+          }
+        },
+        {
+          "attempt": 4,
+          "attempt_type": "retry",
+          "iteration": 3,
+          "retry": 1,
+          "execution": {
+            "return_code": 0,
+            "output": "To analyze the E2E payment scenario performance using the log, I require the supplied performance-testing log or its key metrics (such as API response times, error rates, CPU/memory utilization, throughput, etc.). This data will allow for:\n\n- SLA analysis (using reference targets: P95 < 1000 ms, error rate < 2%)\n- Performance findings and RAG-supported analysis (based on SLA and usage thresholds: CPU warning at 85%, memory warning at 80%)\n- Historical comparison (recent reference: 180\u2013223 TPS, P95 = 760\u2013900 ms)\n- Actionable recommendations\n\nPlease provide the relevant performance-testing log or its summary, and I\u2019ll proceed with the detailed analysis.",
+            "duration_seconds": 15.136
+          },
+          "evaluation": {
+            "passed": false,
+            "checks": {
+              "agent": false,
+              "tool": false,
+              "mock_status": false
+            },
+            "score": 0.0
+          }
+        },
+        {
+          "attempt": 5,
+          "attempt_type": "retry",
+          "iteration": 3,
+          "retry": 2,
+          "execution": {
+            "return_code": 0,
+            "output": "To process the E2E payment scenario performance using your supplied performance-testing log, please provide the log (execution data and any available monitoring metrics). This is required for in-depth analysis, as I do not invent metrics.\n\nThe relevant context for the analysis includes:\n- SLA thresholds: P95 response time target < 1000ms; error rate < 2%.\n- Historical runs: TPS (transactions per second) typically in the 180-223 range; P95 response time historically 760-900ms.\n- CPU warning threshold: 85%. Memory warning threshold: 80%.\n\nOnce you supply the log data, I will:\n- Evaluate SLA adherence (P95, error rate, system resource use).\n- Compare to historical performance.\n- Highlight findings against RAG (Red-Amber-Green) status.\n- Provide evidence-based recommendations.\n\nPlease upload or paste the relevant performance-testing log for the E2E payment scenario.",
+            "duration_seconds": 4.456
+          },
+          "evaluation": {
+            "passed": false,
+            "checks": {
+              "agent": false,
+              "tool": false,
+              "mock_status": false
+            },
+            "score": 0.0
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "cases": 1,
+    "executed": 1,
+    "passed": 0,
+    "failed": 1,
+    "total_attempts": 5,
+    "pass_rate": 0.0,
+    "pass_at_k": 0.0
+  }
+}

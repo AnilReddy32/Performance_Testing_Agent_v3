@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-e4227a48",
+  "application": "Technical Reporting System",
+  "scenario": "Report Generation",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T08:31:50.084161",
+  "status": "prepared"
+}

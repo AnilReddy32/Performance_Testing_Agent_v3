@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-bbdac6cb",
+  "application": "Core Banking",
+  "scenario": "Core Banking Performance Test",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T08:23:55.219356",
+  "status": "prepared"
+}

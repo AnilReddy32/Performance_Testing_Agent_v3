@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-8248d4aa",
+  "application": "payments platform",
+  "scenario": "Payment Validation",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T07:22:27.985664",
+  "status": "prepared"
+}

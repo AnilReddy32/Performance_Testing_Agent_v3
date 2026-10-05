@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-06562b14",
+  "application": "banking application",
+  "scenario": "unknown",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T07:50:24.253984",
+  "status": "prepared"
+}

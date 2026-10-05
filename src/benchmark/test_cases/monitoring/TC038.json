@@ -1,0 +1,19 @@
+{
+  "id": "TC038",
+  "category": "monitoring",
+  "agent": "monitoring_agent",
+  "scenario": "DB connections",
+  "input_type": "user_query",
+  "user_query": "Process the DB connections scenario using the supplied performance-testing log.",
+  "expected_tool": "monitoring",
+  "expected_agent_flow": [
+    "monitoring_agent"
+  ],
+  "expected_result": "Use the supplied log evidence, preserve MOCK status, and never invent unavailable metrics.",
+  "evaluation": {
+    "required_agent": "monitoring_agent",
+    "required_tool": "monitoring",
+    "must_not_hallucinate": true,
+    "must_preserve_execution_mode": true
+  }
+}

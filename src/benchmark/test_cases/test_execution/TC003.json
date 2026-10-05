@@ -1,0 +1,42 @@
+{
+
+  "id": "TC003",
+
+  "category": "test_execution",
+
+  "scenario": "Fund transfer load test",
+ 
+  "input_type": "user_query",
+
+  "user_query": "Execute a fund transfer performance test using JMeter with 1000 virtual users for 300 seconds.",
+
+  "expected_agent": "test_execution_agent",
+
+  "expected_tool": "run_jmeter_test",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "test_execution_agent",
+
+    "jmeter_mcp",
+
+    "run_jmeter_test"
+
+  ],
+
+  "expected_result": "The Test Execution Agent should execute the requested JMeter performance test and return the execution result.",
+
+  "evaluation": {
+
+    "required_agent": "test_execution_agent",
+
+    "required_tool": "run_jmeter_test",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

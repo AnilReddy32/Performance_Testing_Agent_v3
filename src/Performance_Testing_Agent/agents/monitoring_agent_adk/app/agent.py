@@ -52,6 +52,20 @@ monitoring_mcp = McpToolset(
 # Monitoring Agent -- single agent, MCP tool directly attached,
 # JSON output enforced through instruction (not output_schema,
 # since ADK doesn't allow tools + output_schema on one agent).
+#
+# mode="single_turn" added: this agent is used as a sub_agent of
+# performance_testing_orchestrator, which calls each specialist agent
+# in sequence and needs control handed back after each one (test
+# execution -> monitoring -> security -> analysis -> report). Without
+# this, ADK treats it as a one-way chat "transfer" target instead of a
+# call-and-return tool: the orchestrator's LLM has to guess a generic
+# transfer_to_agent(agent_name=...) call instead of getting a
+# purpose-named "monitoring_agent" tool, and even when the transfer
+# succeeds, this agent's own JSON answer becomes the FINAL answer of
+# the whole run - the orchestrator never gets control back to call
+# security_agent/analysis_agent/report_agent afterward. If this agent
+# is ever run standalone again (its own `adk web`/`adk run`, no parent
+# orchestrator), mode="single_turn" is harmless there too.
 # ============================================================
  
 monitoring_agent = Agent(
@@ -60,6 +74,8 @@ monitoring_agent = Agent(
  
     model="gpt-4.1",
  
+    mode="single_turn",
+
     description=(
         "Collects infrastructure and performance "
         "monitoring metrics through MCP."
@@ -90,18 +106,43 @@ RULES:
 - Do not modify the MCP server's results.
  
 INPUT YOU MAY RECEIVE:
-The incoming message may contain a "Test execution output" JSON
-block with job_id, application, and scenario for this same run.
+If a Test Execution output is available in the conversation, extract
+job_id, application, and scenario FROM IT and use those exact values in
+your final JSON response (do not let the MCP tool's own values override
+a real Test Execution job_id/scenario).
+ 
+If no Test Execution output is available, call the Monitoring MCP tool
+with empty strings for job_id/scenario - it will generate its own
+job_id and scenario for this standalone check. Use EXACTLY the
+job_id/scenario values the tool returns in your final JSON response.
+Never write "unknown" for job_id or scenario yourself - the tool always
+returns a real value for both, one way or another.
+
+
+Use monitoring MCP only for:
+- cpu_usage
+- memory_usage
+- db_connections
+- response_time
+- tps
+- alerts
+
+Do not change the Test Execution metadata.
  
 FINAL OUTPUT FORMAT -- NO EXCEPTIONS:
-Your entire final answer must be exactly ONE JSON object, and
-nothing else -- no markdown fences, no commentary before or after
-it, matching this shape:
+
+Call the Monitoring MCP tool and use the returned values.
+Return the MCP tool result as a Python dictionary object.
+Do not serialize the response.
+Do not convert the response to a JSON string.
+Do not wrap the response in markdown.
+Do not rewrite field names.
+Return the result in the following dictionary structure:
  
 {
-  "job_id": "<from the Test execution output block, or \\"unknown\\" if none was given>",
+  "job_id": "<from the Test Execution output block if one was given, otherwise exactly the job_id the MCP tool returned>
   "application": "<from the Test execution output block, or \\"unknown\\">",
-  "scenario": "<from the Test execution output block, or \\"unknown\\">",
+ "scenario": "<from the Test Execution output block if one was given, otherwise exactly the scenario the MCP tool returned>",
   "cpu_usage": <actual number from the MCP server, or 0 if unavailable>,
   "memory_usage": <actual number from the MCP server, or 0 if unavailable>,
   "db_connections": <actual number from the MCP server, or 0 if unavailable>,
@@ -119,4 +160,5 @@ return a metric, use 0 for that field and set status to
     tools=[
         monitoring_mcp,
     ],
+    output_key="monitoring_result",
 )

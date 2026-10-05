@@ -1,0 +1,38 @@
+{
+
+  "id": "TC007",
+
+  "category": "security",
+
+  "scenario": "Authentication security check",
+
+  "input_type": "user_query",
+
+  "user_query": "Check the performance testing scenario for authentication security issues.",
+
+  "expected_agent": "security_agent",
+
+  "expected_tool": "security_analysis",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "security_agent"
+
+  ],
+
+  "expected_result": "The Security Agent should evaluate authentication-related security considerations using available evidence.",
+
+  "evaluation": {
+
+    "required_agent": "security_agent",
+
+    "required_tool": "security_analysis",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 

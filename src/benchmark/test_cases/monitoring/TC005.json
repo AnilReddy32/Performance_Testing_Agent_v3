@@ -1,0 +1,38 @@
+{
+
+  "id": "TC005",
+
+  "category": "monitoring",
+
+  "scenario": "Identify performance bottleneck",
+
+  "input_type": "user_query", 
+  
+  "user_query": "Analyze the monitoring data and identify whether CPU, memory, database connections, or API latency is the main performance bottleneck.",
+
+  "expected_agent": "monitoring_agent",
+
+  "expected_tool": "monitoring",
+
+  "expected_agent_flow": [
+
+    "root_agent",
+
+    "monitoring_agent"
+
+  ],
+
+  "expected_result": "The Monitoring Agent should identify the potential bottleneck based only on available monitoring evidence.",
+
+  "evaluation": {
+
+    "required_agent": "monitoring_agent",
+
+    "required_tool": "monitoring",
+
+    "must_not_hallucinate": true
+
+  }
+
+}
+ 
