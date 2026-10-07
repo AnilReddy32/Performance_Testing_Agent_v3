@@ -1,0 +1,7 @@
+[
+  {
+    "test_case_id": "WTC-001",
+    "name": "Fund Transfer End-to-End Assessment",
+    "prompt": "Run a performance test on the Fund Transfer API using the approved salary-day workload and test environment. Monitor infrastructure during the test, check the approved security controls, analyze bottlenecks, and generate an executive report. Use results from the same test run, clearly distinguish simulated results from real measurements."
+  }
+]

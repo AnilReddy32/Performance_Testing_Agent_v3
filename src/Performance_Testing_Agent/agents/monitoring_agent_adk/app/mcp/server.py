@@ -2,11 +2,10 @@ import csv
 
 from pathlib import Path
  
-from mcp.server.fastmcp import FastMCP
- 
- 
-mcp = FastMCP("Monitoring Performance Server")
- 
+from mcp.server.mcpserver import MCPServer
+
+mcp = MCPServer("Monitoring Performance Server")
+
  
 # ---------------------------------------------------------
 
