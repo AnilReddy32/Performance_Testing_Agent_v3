@@ -10,7 +10,7 @@ if you ever add report-specific fields (e.g. a requested output format).
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
-from app.agents.analysis.schemas import AnalysisOutput
+from ..analysis.schemas import AnalysisOutput
 
 
 class ReportInput(AnalysisOutput):

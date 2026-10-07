@@ -1,0 +1,10 @@
+{
+  "environment_id": "ENV-d9541010",
+  "application": "banking application",
+  "scenario": "standard performance test scenario",
+  "environment": "test",
+  "users": 1,
+  "requirements": "",
+  "prepared_at": "2026-09-29T09:44:44.308539",
+  "status": "prepared"
+}

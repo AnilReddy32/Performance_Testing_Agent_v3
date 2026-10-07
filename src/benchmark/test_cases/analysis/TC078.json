@@ -1,0 +1,19 @@
+{
+  "id": "TC078",
+  "category": "analysis",
+  "agent": "analysis_agent",
+  "scenario": "missing throughput",
+  "input_type": "user_query",
+  "user_query": "Process the missing throughput scenario using the supplied performance-testing log.",
+  "expected_tool": "analysis",
+  "expected_agent_flow": [
+    "analysis_agent"
+  ],
+  "expected_result": "Use the supplied log evidence, preserve MOCK status, and never invent unavailable metrics.",
+  "evaluation": {
+    "required_agent": "analysis_agent",
+    "required_tool": "analysis",
+    "must_not_hallucinate": true,
+    "must_preserve_execution_mode": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "TC084",
+  "category": "reporting",
+  "agent": "report_agent",
+  "scenario": "security report",
+  "input_type": "user_query",
+  "user_query": "Process the security report scenario using the supplied performance-testing log.",
+  "expected_tool": "report",
+  "expected_agent_flow": [
+    "report_agent"
+  ],
+  "expected_result": "Use the supplied log evidence, preserve MOCK status, and never invent unavailable metrics.",
+  "evaluation": {
+    "required_agent": "report_agent",
+    "required_tool": "report",
+    "must_not_hallucinate": true,
+    "must_preserve_execution_mode": true
+  }
+}

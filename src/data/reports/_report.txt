@@ -1,0 +1,8 @@
+Report Not Generated -- Invalid Data
+====================================
+Job  for application '' (scenario: ) could not be analyzed.
+
+Reason: No test_execution records were provided for this job.
+
+Action required: re-run the test or correct the source data, then resubmit to the Analysis Agent.
+

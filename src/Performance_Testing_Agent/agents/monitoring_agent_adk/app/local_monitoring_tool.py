@@ -100,7 +100,7 @@ def collect_monitoring_metrics() -> dict:
         "cpu_usage": cpu,
         "memory_usage": memory,
         "db_connections": db_connections,
-        "response_time_ms": response_time,
+        "response_time": response_time,
         "tps": tps,
         "alerts": alerts,
         "message": "Monitoring analysis completed using the provided monitoring data.",

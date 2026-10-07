@@ -1,0 +1,17 @@
+{
+  "iterations": 3,
+  "retry_failed": 2,
+  "stop_on_error": false,
+  "parallel_execution": false,
+  "timeout_seconds": 300,
+  "execution": {
+    "mode": "agents_cli",
+    "command": "agents-cli run",
+    "extra_args": [
+      "--verbose"
+    ]
+  },
+  "output": {
+    "results_file": "benchmark_results.json"
+  }
+}
