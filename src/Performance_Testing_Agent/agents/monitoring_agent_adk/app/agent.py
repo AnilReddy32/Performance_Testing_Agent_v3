@@ -73,8 +73,6 @@ monitoring_agent = Agent(
     name="monitoring_agent",
  
     model="gpt-4.1",
-
-    mode = "single_turn",
  
     mode="single_turn",
 

@@ -23,28 +23,14 @@
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Fund Transfer API Request" enabled="true">
           <stringProp name="HTTPSampler.domain">localhost</stringProp>
-          <stringProp name="HTTPSampler.port">8080</stringProp>
+          <stringProp name="HTTPSampler.port">80</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
-          <stringProp name="HTTPSampler.path">/api/fund-transfer</stringProp>
+          <stringProp name="HTTPSampler.path">/fund-transfer</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
-          <boolProp name="HTTPSampler.do_multipart">false</boolProp>
-          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
-            <collectionProp name="Arguments.arguments">
-              <elementProp name="amount" elementType="Argument">
-                <stringProp name="Argument.name">amount</stringProp>
-                <stringProp name="Argument.value">100</stringProp>
-                <boolProp name="Argument.metadata">=</boolProp>
-              </elementProp>
-              <elementProp name="toAccount" elementType="Argument">
-                <stringProp name="Argument.name">toAccount</stringProp>
-                <stringProp name="Argument.value">ACCOUNT_NUMBER</stringProp>
-                <boolProp name="Argument.metadata">=</boolProp>
-              </elementProp>
-            </collectionProp>
-          </elementProp>
+          <boolProp name="HTTPSampler.do_gzip">false</boolProp>
         </HTTPSamplerProxy>
         <hashTree/>
       </hashTree>
