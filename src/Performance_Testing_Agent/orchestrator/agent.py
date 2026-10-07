@@ -26,8 +26,6 @@ from security_agent.config import settings
 
 from ..agents.security_agent_adk.security_agent.agent import root_agent as security_agent
 
-from security_agent.agent import root_agent as security_agent
-
 from ..agents.monitoring_agent_adk.app.agent import monitoring_agent
 # from ..agents.security import security_agent
 from ..agents.Analysis_Report_agent_adk.app.agents.analysis.agent import analysis_agent

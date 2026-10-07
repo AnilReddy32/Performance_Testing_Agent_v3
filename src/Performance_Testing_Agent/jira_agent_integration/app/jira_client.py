@@ -37,7 +37,10 @@ def get_pending_issues():
         },
         params={
             "jql": jql,
-            "fields": "summary,description,status,labels,attachment",
+            "fields": (
+                "summary,description,status,labels,attachment,"
+                "customfield_10332"
+            ),
             "maxResults": 10
         },
         timeout=30
@@ -209,10 +212,79 @@ def download_attachment(attachment_id: str) -> bytes:
 
 #     return response.json()
 
+def find_test_case_fields():
+    response = requests.get(
+        f"{JIRA_URL.rstrip('/')}/rest/api/3/field",
+        auth=(JIRA_EMAIL, JIRA_API_TOKEN),
+        headers={"Accept": "application/json"},
+        timeout=30,
+    )
+    response.raise_for_status() 
+
+    return [
+        field
+        for field in response.json()
+        if field.get("name") == "Test Case ID"
+    ]
+
+
+def inspect_field_contexts(field_id: str):
+    response = requests.get(
+        f"{JIRA_URL.rstrip('/')}/rest/api/3/field/{field_id}/context",
+        auth=(JIRA_EMAIL, JIRA_API_TOKEN),
+        headers={"Accept": "application/json"},
+        timeout=30,
+    )
+
+    # Return diagnostic details even if Jira rejects this request.
+    return {
+        "status_code": response.status_code,
+        "body": response.text,
+    }
 
 
 
+def add_issue_comment(issue_key: str, comment: str) -> dict:
+    """Post a plain-text comment using Jira Cloud's document format."""
 
+    if not isinstance(comment, str) or not comment.strip():
+        raise ValueError("Jira comment cannot be empty.")
+
+    # Jira Cloud REST API v3 expects Atlassian Document Format (ADF).
+    paragraphs = []
+
+    for line in comment.splitlines():
+        paragraphs.append(
+            {
+                "type": "paragraph",
+                "content": (
+                    [{"type": "text", "text": line}]
+                    if line
+                    else []
+                ),
+            }
+        )
+
+    response = requests.post(
+        f"{JIRA_URL.rstrip('/')}/rest/api/3/issue/{issue_key}/comment",
+        auth=(JIRA_EMAIL, JIRA_API_TOKEN),
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        },
+        json={
+            "body": {
+                "type": "doc",
+                "version": 1,
+                "content": paragraphs,
+            }
+        },
+        timeout=30,
+    )
+
+    response.raise_for_status()
+
+    return response.json()
 
 
 
