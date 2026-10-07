@@ -416,7 +416,7 @@ the requested operation completed successfully.
 
 Do not claim that a Jira issue was moved to Done. Jira transitions are
 controlled by the integration application.
-"""
+
 Only after every agent in your step-1 plan has been called: reply to the
 user with a concise natural language summary of what was done and the key
 results. Do not fabricate data - only summarize what the agents actually

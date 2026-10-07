@@ -2,12 +2,12 @@ import csv
 
 from pathlib import Path
  
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from datetime import datetime, timezone
  
  
-mcp = FastMCP("Monitoring Performance Server")
+mcp = MCPServer("Monitoring Performance Server")
  
  
 # ---------------------------------------------------------
