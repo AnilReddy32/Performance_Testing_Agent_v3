@@ -3,5 +3,50 @@
     "test_case_id": "WTC-001",
     "name": "Fund Transfer End-to-End Assessment",
     "prompt": "Run a performance test on the Fund Transfer API using the approved salary-day workload and test environment. Monitor infrastructure during the test, check the approved security controls, analyze bottlenecks, and generate an executive report. Use results from the same test run, clearly distinguish simulated results from real measurements."
+  },
+  {
+    "test_case_id": "WTC-002",
+    "name": "Mobile Banking login",
+    "prompt": "Validate that the mobile banking login and transfer flows stay responsive under peak traffic - run the test, monitor CPU/memory, and report the results."
+  },
+  {
+    "test_case_id": "WTC-003",
+    "name": "Payments API",
+    "prompt": "Run a full test cycle on the payments API - execution, monitoring, security, root-cause analysis - and tell me whether it's ready for production based on the combined findings."
+  },
+  {
+    "test_case_id": "WTC-004",
+    "name": "UPI Payment — Load Testing with 10,000 Concurrent Users",
+    "prompt": "Run a load test for the UPI Payment module with 10,000 concurrent users. Generate a k6 script and prepare synthetic banking customer data with dynamic transaction data. During execution, monitor CPU, memory, API response times, TPS, and successful and failed transactions. Validate API authentication, token expiration handling, and API rate limiting. Compare the execution results against SLA requirements, identify performance bottlenecks, and analyze scalability under heavy load. Generate a PDF performance report, an HTML dashboard, and an executive summary"
+  },
+  {
+    "test_case_id": "WTC-005",
+    "name": "Fund Transfer API",
+    "prompt": "Generate a Gatling script for the Fund Transfer APIs and execute a stress test until the application reaches its breaking point. Monitor CPU, memory, database connections, thread utilization, TPS, and error rates. Alert when CPU exceeds 85% or memory exceeds 80%. Validate API authentication, role-based access control, and protection against unauthorized API access. Analyze the bottleneck, investigate any decrease in TPS, and identify the root causes of CPU spikes or database degradation. Generate a stress test report with optimization recommendations and an executive summary."
+  },
+  {
+    "test_case_id": "WTC-006",
+    "name": "Internet Banking",
+    "prompt": "Prepare Internet Banking test accounts and run an endurance test for 8 hours with concurrent user simulation. Monitor memory, JVM heap usage, database connections, server health, application logs, and error rates throughout execution. Validate MFA, session timeout policies. Analyze memory leaks, database performance degradation, and application stability, and determine whether SLA requirements were met. Generate an endurance test report, memory utilization report, and infrastructure health report."
+  },
+  {
+    "test_case_id": "WTC-007",
+    "name": "Account Summary — Volume Testing",
+    "prompt": "Generate 100,000 banking transactions and execute a volume test for the Account Summary service using bulk transaction simulation. Monitor database connections, disk utilization, memory usage, API response times, and error rates. Validate API authentication, role-based access control, and customer data encryption. Analyze database performance degradation, identify slow database queries, and compare results against SLA requirements. Generate database performance, detailed SLA, and PDF performance reports."
+  },
+  {
+    "test_case_id": "WTC-008",
+    "name": "Login API",
+    "prompt": "Create a JMeter script for the Login service, generate login credentials for virtual users, and execute a baseline performance test. Monitor API response times, CPU, memory, throughput, and application logs. Validate authentication, secure password policies, token expiration handling, and session timeout policies. Analyze high response times and application log errors, identify bottlenecks, and determine whether the baseline meets SLA requirements. Generate an API performance report, a response time report, and a security assessment report, and export the performance results as JSON."
+  },
+  {
+    "test_case_id": "WTC-009",
+    "name": "NEFT",
+    "prompt": "Execute performance testing for NEFT transactions using synthetic banking customer data and dynamic transaction data. Monitor TPS, API response times, database connections, successful transactions, and failed transactions. Validate API authentication, protection against unauthorized API access, and customer data encryption. Compare the results against SLA requirements, analyze failed transactions and database performance, and recommend improvements. Generate a complete NEFT performance report, including TPS analysis, SLA findings, security findings, and an executive summary."
+  },
+  {
+    "test_case_id": "WTC-010",
+    "name": "Account Balance API",
+    "prompt": "Run API load testing for the Account Balance APIs with concurrent user simulation. Monitor API response times, throughput, database connections, CPU, and memory. Validate API authentication, protection against unauthorized API access, and API rate limiting. Analyze high response times, slow database queries, and performance bottlenecks, and compare the results with SLA requirements. Generate response time, database performance, and detailed SLA reports, and export the performance report as a pdf."
   }
 ]
