@@ -71,6 +71,36 @@
           "enabled": false,
           "requests_per_minute": 10
         }
+      },
+      {
+        "path": "/api/transfer",
+        "method": "POST",
+        "name": "Fund Transfer API",
+        "authentication_required": true,
+        "authorization_required": true,
+        "allowed_roles": [
+          "user",
+          "admin"
+        ],
+        "rate_limit": {
+          "enabled": true,
+          "requests_per_minute": 30
+        }
+      },
+      {
+        "path": "/api/account/summary",
+        "method": "GET",
+        "name": "Account Summary API",
+        "authentication_required": true,
+        "authorization_required": true,
+        "allowed_roles": [
+          "user",
+          "admin"
+        ],
+        "rate_limit": {
+          "enabled": true,
+          "requests_per_minute": 60
+        }
       }
     ]
   },
@@ -88,6 +118,19 @@
   "csrf_security": {
     "protection_enabled": true,
     "csrf_token_validation": true
+  },
+
+  "data_encryption": {
+    "at_rest": {
+      "enabled": true,
+      "algorithm": "AES-256"
+    },
+    "in_transit": {
+      "enabled": true,
+      "protocol": "TLS",
+      "minimum_version": "1.2"
+    },
+    "customer_data_encrypted": true
   },
 
   "oauth": {

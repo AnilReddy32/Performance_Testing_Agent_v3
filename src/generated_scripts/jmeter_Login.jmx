@@ -7,18 +7,20 @@
       <elementProp name="TestPlan.user_defined_variables" elementType="Arguments">
         <collectionProp name="Arguments.arguments"/>
       </elementProp>
-      <stringProp name="TestPlan.functional_mode">false</stringProp>
-      <stringProp name="TestPlan.tearDown_on_shutdown">true</stringProp>
-      <stringProp name="TestPlan.serialize_threadgroups">false</stringProp>
+      <stringProp name="TestPlan.name">Login Test Plan</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
     </TestPlan>
     <hashTree>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Thread Group" enabled="true">
-        <stringProp name="ThreadGroup.num_threads">10</stringProp>
-        <stringProp name="ThreadGroup.ramp_time">5</stringProp>
-        <stringProp name="ThreadGroup.loop_count">1</stringProp>
-        <elementProp name="ThreadGroup.scheduler" elementType="Scheduler">
-          <boolProp name="ThreadGroup.scheduler">false</boolProp>
-        </elementProp>
+        <stringProp name="ThreadGroup.name">User Login Thread Group</stringProp>
+        <elementProp name="ThreadGroup.num_threads" elementType="Integer">10</elementProp>
+        <elementProp name="ThreadGroup.ramp_time" elementType="Integer">5</elementProp>
+        <elementProp name="ThreadGroup.loop_count" elementType="Integer">1</elementProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
       </ThreadGroup>
       <hashTree>
         <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="Login Request" enabled="true">
@@ -32,6 +34,20 @@
           <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
           <boolProp name="HTTPSampler.do_multipart">false</boolProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
+          <elementProp name="HTTPsampler.Arguments" elementType="Arguments">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="username" elementType="Argument">
+                <stringProp name="Argument.name">username</stringProp>
+                <stringProp name="Argument.value">${username}</stringProp>
+                <boolProp name="Argument.metadata">=</boolProp>
+              </elementProp>
+              <elementProp name="password" elementType="Argument">
+                <stringProp name="Argument.name">password</stringProp>
+                <stringProp name="Argument.value">${password}</stringProp>
+                <boolProp name="Argument.metadata">=</boolProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
         </HTTPSamplerProxy>
         <hashTree/>
       </hashTree>

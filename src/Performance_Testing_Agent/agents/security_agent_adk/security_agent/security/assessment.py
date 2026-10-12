@@ -163,6 +163,11 @@ def build_security_response(
 
     security_score = calculate_security_score(state.assessments)
 
+    # A score computed from only the controls that could be assessed would
+    # overstate security when required evidence is missing.
+    if state.missing_evidence:
+        security_score = "N/A"
+
     return SecurityResponse(
         status=status,
         security_score=security_score,
