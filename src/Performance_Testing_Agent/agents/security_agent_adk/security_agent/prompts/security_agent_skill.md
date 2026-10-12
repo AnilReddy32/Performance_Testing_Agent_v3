@@ -475,6 +475,8 @@ Use `get_api_information` when the assessment requires:
 
 Use endpoint filtering when the user specifies a particular endpoint.
 
+When the user names an API by description (for example "Fund Transfer API") instead of an exact path, first call `get_api_information()` with no filter, match the API to an endpoint using its `name` field or path keywords, then assess that endpoint using the matched entry's exact `path` and `method`. Never pass a descriptive name or a guessed path as the `endpoint` argument. Return WARNING for missing endpoint evidence only if no endpoint in the unfiltered result reasonably matches the named API.
+
 ## Validator selection
 
 After retrieving evidence, select only the validators relevant to the user's objective.
@@ -690,6 +692,12 @@ Do not manually construct a competing final response when the finalization tool 
 ## State continuity
 
 Always use the latest state returned by the previous assessment-state tool.
+
+Pass `state_data` exactly as returned by the previous assessment-state tool. Never edit it, rebuild it, or construct it by hand.
+
+When calling `record_assessment()`, pass the complete dictionary returned by the validator, unchanged, as `result`. Do not extract, rename, or wrap its fields.
+
+Record missing evidence only by calling `record_missing_evidence(state_data, requirement="<text describing the missing evidence>")`. Never add missing-evidence text or any other string to the `assessments` list.
 
 Never discard previously recorded evidence or assessments.
 
