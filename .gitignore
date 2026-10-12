@@ -20,3 +20,6 @@ venv/
 
 # ADK local data
 .adk/
+
+# RAG vector store (generated, not source)
+vector_db/
