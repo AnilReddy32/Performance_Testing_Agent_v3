@@ -15,6 +15,7 @@ SUPPORTED_EXTENSIONS = {
     ".json",
     ".csv",
     ".pdf",
+    ".xlsx",
 }
 
 def _limit_text(text: str) -> str:
@@ -81,6 +82,47 @@ def extract_pdf(content: bytes) -> str:
     return _limit_text("\n\n".join(pages))
 
 
+def extract_xlsx(content: bytes) -> str:
+    # Imported lazily so the other attachment types keep working even if
+    # openpyxl is not installed.
+    try:
+        from openpyxl import load_workbook
+    except ImportError as exc:
+        raise ValueError(
+            "Reading .xlsx attachments requires 'openpyxl'. "
+            "Install it with: pip install openpyxl"
+        ) from exc
+
+    workbook = load_workbook(
+        io.BytesIO(content), read_only=True, data_only=True
+    )
+
+    sheets = []
+
+    try:
+        for sheet in workbook.worksheets:
+            rows = []
+
+            for row in sheet.iter_rows(values_only=True):
+                cells = [
+                    "" if cell is None else str(cell).strip()
+                    for cell in row
+                ]
+
+                # Skip completely empty rows
+                if any(cells):
+                    rows.append(" | ".join(cells).rstrip(" |"))
+
+            if rows:
+                sheets.append(
+                    f"--- Sheet: {sheet.title} ---\n" + "\n".join(rows)
+                )
+    finally:
+        workbook.close()
+
+    return _limit_text("\n\n".join(sheets))
+
+
 def extract_attachment(filename: str, content: bytes) -> str:
     """
     Extract text from the supported documents
@@ -107,6 +149,8 @@ def extract_attachment(filename: str, content: bytes) -> str:
         extracted_text = extract_csv(content)
     elif extension == ".pdf":
         extracted_text = extract_pdf(content)
+    elif extension == ".xlsx":
+        extracted_text = extract_xlsx(content)
     else:
         raise ValueError(
             f"Unsupported attachment type: {extension}"
