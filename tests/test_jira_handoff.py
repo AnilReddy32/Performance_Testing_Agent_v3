@@ -51,6 +51,7 @@ class TestJiraHandoff(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(context["jira_issue_key"], "PTA-MOCK")
         self.assertEqual(context["summary"], "Verify test-case handoff")
         self.assertEqual(context["test_case_id"], "PTC-001")
+        self.assertEqual(context["execution_mode"], "SIMULATED")
 
         # Verify the whole definition, not only the ID.
         self.assertEqual(
@@ -98,6 +99,13 @@ class TestJiraHandoff(unittest.IsolatedAsyncioTestCase):
             result = await jira_service.process_single_issue(sample_issue())
 
             context = self.assert_prompt_context(mocked_runner)
+            execution_state = mocked_runner.await_args.kwargs["initial_state"]
+            self.assertEqual(execution_state["execution_mode"], "SIMULATED")
+            self.assertEqual(execution_state["execution_source_id"], "PTA-MOCK")
+            self.assertEqual(
+                execution_state["workload_profile"]["endpoint"],
+                "/api/payment",
+            )
 
             self.assertEqual(
                 context["attachment_content"],
@@ -231,6 +239,13 @@ class TestJiraHandoff(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 context["test_case"]["prompt"],
                 expected_case["prompt"],
+            )
+            self.assertEqual(context["execution_mode"], "SIMULATED")
+            execution_state = mocked_runner.await_args.kwargs["initial_state"]
+            self.assertEqual(execution_state["execution_mode"], "SIMULATED")
+            self.assertEqual(
+                execution_state["workload_profile"],
+                expected_case["workload_profile"],
             )
 
             mocked_attachments.assert_awaited_once_with([])
