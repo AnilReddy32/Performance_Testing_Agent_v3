@@ -46,7 +46,7 @@ with multiple IDs is rejected as ambiguous. In ADK Web, a new explicit case
 can replace a prior job only when that job is not running.
 
 The workload profile is a typed view of the catalog's execution inputs:
-`tool`, `target_url`, `environment` (initially `mock_api`), `endpoint`,
+`tool`, `target_url`, `environment` (`mock_api` or `external_api`), `endpoint`,
 `method`, `payload_template`, `expected_status_code`, `p95_threshold_ms`,
 `users`, `duration_seconds`, `ramp_up_seconds`, `max_rps`, and
 `credentials_ref`. Real k6 preparation requires an explicit p95 threshold;
@@ -63,6 +63,7 @@ Real-run preflight defaults are intentionally limited to the local mock API:
 
 ```dotenv
 REAL_EXECUTION_ENABLED=false
+REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED=false
 REAL_EXECUTION_ALLOWED_HOSTS=localhost,127.0.0.1
 REAL_EXECUTION_ALLOWED_PORTS=8000
 REAL_EXECUTION_MAX_USERS=500
@@ -72,10 +73,38 @@ EXECUTION_ARTIFACTS_ROOT=src/generated_scripts/artifacts
 ```
 
 Unset safety limits use the defaults above; malformed settings block REAL
-preflight. The initial target check requires an allowlisted host, loopback DNS
-resolution, and an allowed port. The real runner must repeat target validation
-for every redirect before following it. Add a non-local hostname only after
-the test environment and workload have been explicitly approved.
+preflight. Local `mock_api` targets must resolve only to loopback addresses.
+External targets are disabled by default. To enable a specific approved HTTPS
+API, set `REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED=true`, add its exact hostname
+to `REAL_EXECUTION_ALLOWED_HOSTS`, and add its HTTPS port to
+`REAL_EXECUTION_ALLOWED_PORTS` (normally `443`). External DNS results must all
+be public addresses. Keep the allowlist limited to systems you are authorized
+to load test. Redirect following is disabled in the generated k6 request so a
+redirect cannot send load to a second host. The runner repeats target
+validation immediately before execution. For production deployments, enforce
+the same destination policy with network egress controls as well.
+
+For example, after confirming that `reqres.in` is approved for your test,
+configure:
+
+```dotenv
+REAL_EXECUTION_ENABLED=true
+REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED=true
+REAL_EXECUTION_ALLOWED_HOSTS=localhost,127.0.0.1,reqres.in
+REAL_EXECUTION_ALLOWED_PORTS=8000,443
+```
+
+Then define the catalog case with `environment: "external_api"`,
+`target_url: "https://reqres.in"`, and `endpoint: "/api/users/2"`. Keep
+`target_url` as the origin; the request path belongs in `endpoint`. Include the
+method, expected status, p95 threshold, users, max RPS, duration, ramp-up, and
+`credentials_ref: "none"` for an unauthenticated endpoint. For a protected
+API, use `header_env` to map header names to environment variable names, for
+example `{"x-api-key": "REQRES_API_KEY"}`; set the secret value in the
+process environment or `.env`, never in the catalog. The runner forwards only
+the explicitly referenced variables to k6. The external path uses the same
+reviewed k6 template and native-report artifact flow and does not require the
+local mock server.
 
 The safe mock API used for local k6 validation is
 `Performance_Testing_Agent.mock_api:app`. Start it bound to loopback only:

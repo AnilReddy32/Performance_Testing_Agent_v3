@@ -79,7 +79,10 @@ def _artifact_name(script_path: Path, suffix: str) -> str:
     return f"{script_path.stem}_{suffix}"
 
 
-def _child_environment(target_url: str) -> dict[str, str]:
+def _child_environment(
+    target_url: str,
+    header_env: dict[str, str] | None = None,
+) -> dict[str, str]:
     allowed_environment = {
         "PATH",
         "HOME",
@@ -96,6 +99,13 @@ def _child_environment(target_url: str) -> dict[str, str]:
         for key, value in os.environ.items()
         if key in allowed_environment
     }
+    for env_name in (header_env or {}).values():
+        secret_value = os.environ.get(env_name)
+        if not secret_value:
+            raise ValueError(
+                f"Required request-header environment variable {env_name} is not set."
+            )
+        environment[env_name] = secret_value
     environment["BASE_URL"] = target_url.rstrip("/")
     environment.update(
         {
@@ -466,14 +476,14 @@ def run_real_k6_test(
             "runner_log": log_path,
         }
         artifacts["generated_script"] = resolved_script.name
-        environment = _child_environment(profile.target_url)
+        environment = _child_environment(profile.target_url, profile.header_env)
         environment["K6_WEB_DASHBOARD_EXPORT"] = str(report_path)
 
         inspect_result = subprocess.run(
             [
                 executable,
                 "inspect",
-                "--include-system-env-vars=false",
+                "--include-system-env-vars=true",
                 "-e",
                 f"BASE_URL={profile.target_url.rstrip('/')}",
                 str(resolved_script),
@@ -496,6 +506,17 @@ def run_real_k6_test(
                 + (inspect_result.stderr or inspect_result.stdout or "no details")
             )
 
+        run_preflight = validate_real_profile(profile)
+        if run_preflight["status"] != "ready":
+            raise ValueError(
+                "REAL k6 execution preflight failed immediately before run: "
+                + "; ".join(
+                    run_preflight.get("blocked_reasons")
+                    or run_preflight.get("missing_inputs")
+                    or ["unknown preflight failure"]
+                )
+            )
+
         sampler = RuntimeMetricsSampler(runtime_samples_path)
         sampler.start()
         run_started_at = datetime.now(timezone.utc)
@@ -506,7 +527,7 @@ def run_real_k6_test(
                     "run",
                     "--rps",
                     str(profile.max_rps),
-                    "--include-system-env-vars=false",
+                    "--include-system-env-vars=true",
                     "--out",
                     f"json={raw_path}",
                     "--summary-export",

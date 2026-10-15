@@ -89,6 +89,12 @@ def build_real_k6_script(
             ensure_ascii=True,
             allow_nan=False,
         )
+        header_env_json = json.dumps(
+            profile.header_env or {},
+            ensure_ascii=True,
+            allow_nan=False,
+            separators=(",", ":"),
+        )
     except (TypeError, ValueError) as exc:
         raise ValueError(
             "The k6 workload profile contains values that cannot be "
@@ -115,6 +121,7 @@ const ENDPOINT = {endpoint_json};
 const METHOD = {json.dumps(profile.method)};
 const BODY_TEMPLATE = {body_template_js};
 const EXPECTED_STATUS = {profile.expected_status_code};
+const HEADER_ENV = {header_env_json};
 
 if (!BASE_URL) {{
   throw new Error('BASE_URL must be provided by the trusted execution runner.');
@@ -136,6 +143,13 @@ export default function () {{
 {content_type_header}  }};
   if (__ENV.AUTHORIZATION_HEADER) {{
     headers.Authorization = __ENV.AUTHORIZATION_HEADER;
+  }}
+  for (const [headerName, envName] of Object.entries(HEADER_ENV)) {{
+    const headerValue = __ENV[envName];
+    if (!headerValue) {{
+      throw new Error(`Required header environment variable ${{envName}} is missing.`);
+    }}
+    headers[headerName] = headerValue;
   }}
   const requestBody = BODY_TEMPLATE === null
     ? null

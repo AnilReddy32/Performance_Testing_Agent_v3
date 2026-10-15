@@ -93,10 +93,11 @@ class WorkloadProfile(BaseModel):
 
     tool: Literal["k6", "jmeter", "gatling"] | None = None
     target_url: str | None = None
-    environment: Literal["mock_api"] | None = None
+    environment: Literal["mock_api", "external_api"] | None = None
     endpoint: str | None = None
     method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] | None = None
     payload_template: dict[str, Any] | list[Any] | None = None
+    header_env: dict[str, str] | None = None
     expected_status_code: int | None = Field(default=None, ge=100, le=599)
     users: int | None = Field(default=None, ge=1)
     max_rps: int | None = Field(default=None, ge=1)
@@ -228,6 +229,7 @@ def _catalog_profile_data(test_case: dict[str, Any]) -> dict[str, Any]:
             else None
         ),
         "payload_template": test_case.get("payload_template"),
+        "header_env": test_case.get("header_env"),
         "expected_status_code": test_case.get(
             "expected_status_code",
             test_case.get("expected_status"),
@@ -351,12 +353,34 @@ def _allowed_ports() -> set[int]:
     return ports
 
 
-def validate_target_url(target_url: str) -> list[str]:
-    """Validate the origin and every resolved address against the allowlist.
+def _external_targets_enabled() -> bool:
+    raw_value = os.getenv("REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED", "false")
+    normalized = raw_value.strip().lower()
+    if normalized not in {"true", "false", "1", "0", "yes", "no"}:
+        raise ValueError(
+            "REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED must be one of "
+            "true/false, 1/0, or yes/no."
+        )
+    return normalized in {"true", "1", "yes"}
 
-    A real runner must call this again for every redirect target before
-    following it; Phase 1 performs the initial-target preflight only.
-    """
+
+def _resolve_target_addresses(host: str, port: int) -> tuple[set[str], str | None]:
+    try:
+        resolved = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        return set(), f"Could not resolve allowed target host '{host}': {exc}."
+    addresses = {entry[4][0].split("%", 1)[0] for entry in resolved}
+    if not addresses:
+        return set(), f"Target host '{host}' resolved to no addresses."
+    return addresses, None
+
+
+def validate_target_url(
+    target_url: str,
+    *,
+    environment: str = "mock_api",
+) -> list[str]:
+    """Validate an approved local or external origin and its DNS addresses."""
     errors: list[str] = []
     try:
         parsed = urlsplit(target_url)
@@ -365,8 +389,6 @@ def validate_target_url(target_url: str) -> list[str]:
     except ValueError:
         return ["target_url is not a valid URL."]
 
-    if parsed.scheme != "http":
-        errors.append("target_url must use http for the approved local mock.")
     if not hostname:
         errors.append("target_url must include a hostname.")
         return errors
@@ -374,6 +396,31 @@ def validate_target_url(target_url: str) -> list[str]:
         errors.append("target_url must not include embedded credentials.")
 
     normalized_host = hostname.lower().rstrip(".")
+    is_external = environment == "external_api"
+    if environment not in {"mock_api", "external_api"}:
+        errors.append("environment must be mock_api or external_api.")
+    if is_external:
+        if parsed.scheme != "https":
+            errors.append("External API target_url must use HTTPS.")
+        try:
+            external_enabled = _external_targets_enabled()
+        except ValueError as exc:
+            return [str(exc)]
+        if not external_enabled:
+            errors.append(
+                "REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED is false; "
+                "external targets are disabled."
+            )
+        try:
+            ipaddress.ip_address(normalized_host)
+            is_ip_literal = True
+        except ValueError:
+            is_ip_literal = False
+        if is_ip_literal:
+            errors.append("External API targets must use an allowlisted DNS hostname.")
+    elif parsed.scheme != "http":
+        errors.append("Mock API target_url must use http.")
+
     if normalized_host not in _allowed_hosts():
         errors.append(
             f"Target host '{hostname}' is not in REAL_EXECUTION_ALLOWED_HOSTS."
@@ -393,27 +440,30 @@ def validate_target_url(target_url: str) -> list[str]:
         )
 
     if normalized_host in _allowed_hosts():
-        try:
-            resolved = socket.getaddrinfo(
-                normalized_host,
-                resolved_port,
-                type=socket.SOCK_STREAM,
-            )
-        except OSError as exc:
-            errors.append(
-                f"Could not resolve allowed target host '{hostname}': {exc}."
-            )
-        else:
-            addresses = {entry[4][0] for entry in resolved}
-            if not addresses:
-                errors.append(f"Target host '{hostname}' resolved to no addresses.")
-            elif any(
-                not ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
-                for address in addresses
-            ):
+        addresses, resolution_error = _resolve_target_addresses(
+            normalized_host,
+            resolved_port,
+        )
+        if resolution_error:
+            errors.append(resolution_error)
+        elif is_external:
+            invalid_addresses = []
+            for address in addresses:
+                try:
+                    parsed_address = ipaddress.ip_address(address)
+                except ValueError:
+                    invalid_addresses.append(address)
+                    continue
+                if not parsed_address.is_global:
+                    invalid_addresses.append(address)
+            if invalid_addresses:
                 errors.append(
-                    f"Target host '{hostname}' resolves to a non-loopback address."
+                    f"External target '{hostname}' resolves to a non-public address."
                 )
+        elif any(not ipaddress.ip_address(address).is_loopback for address in addresses):
+            errors.append(
+                f"Target host '{hostname}' resolves to a non-loopback address."
+            )
     return errors
 
 
@@ -431,22 +481,43 @@ def validate_real_profile(
     assert profile is not None
     errors: list[str] = []
     if profile.endpoint is not None:
-        endpoint_path = unquote(profile.endpoint)
+        endpoint_parts = urlsplit(profile.endpoint)
+        endpoint_path = unquote(endpoint_parts.path)
         if (
             not profile.endpoint.startswith("/")
             or profile.endpoint.startswith("//")
             or "://" in profile.endpoint
             or profile.endpoint.startswith("//")
             or "\\" in endpoint_path
-            or "?" in profile.endpoint
             or "#" in profile.endpoint
             or any(ord(character) < 32 or ord(character) == 127 for character in endpoint_path)
             or endpoint_path.startswith("//")
             or any(part == ".." for part in endpoint_path.split("/"))
         ):
             errors.append(
-                "endpoint must be a local absolute path, not a URL or traversal path."
+                "endpoint must be an absolute path, not a URL or traversal path."
             )
+    if profile.header_env is not None:
+        forbidden_headers = {
+            "connection",
+            "content-length",
+            "host",
+            "transfer-encoding",
+            "upgrade",
+        }
+        for header_name, env_name in profile.header_env.items():
+            normalized_header = header_name.lower()
+            if (
+                not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", header_name)
+                or normalized_header in forbidden_headers
+                or normalized_header.startswith("proxy-")
+            ):
+                errors.append(f"header_env contains an unsupported header name: {header_name!r}.")
+            if not re.fullmatch(r"[A-Z_][A-Z0-9_]*", env_name):
+                errors.append(
+                    f"header_env value for {header_name!r} must be an uppercase "
+                    "environment variable name."
+                )
     try:
         max_users = _configured_positive_int("REAL_EXECUTION_MAX_USERS", 500)
         max_duration = _configured_positive_int(
@@ -477,7 +548,12 @@ def validate_real_profile(
             errors.append(
                 "duration_seconds must accommodate both ramp-up and ramp-down."
             )
-        errors.extend(validate_target_url(profile.target_url or ""))
+        errors.extend(
+            validate_target_url(
+                profile.target_url or "",
+                environment=profile.environment or "mock_api",
+            )
+        )
         real_execution_enabled = _enabled_by_configuration()
     except ValueError as exc:
         return {
