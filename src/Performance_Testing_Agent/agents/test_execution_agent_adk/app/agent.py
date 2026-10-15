@@ -342,7 +342,12 @@ generation-only requests must NOT automatically execute a test.
 
 The final standardized execution result must preserve the exact 13-field contract required by the downstream Analysis Agent.
 
-Once the execution is completed provide the metrics to the user.
+Return the exact execution result and available artifact paths to the
+orchestrator. Do not claim that a consolidated PDF was generated; only the
+Report Agent can confirm that by returning its report path. If the REAL
+execution result contains a native_report or native_report_archive artifact,
+identify it as already generated and include its path in the result. Do not
+offer to provide it later or ask whether the user wants it.
 """,
     tools=[
         run_test_execution_adk,

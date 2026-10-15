@@ -187,6 +187,21 @@ fields actually absent from the catalog.
 STEP 1 - PLAN BEFORE YOU CALL ANYTHING
 ----------------------------------------------------
 
+REPORTING RULE:
+First decide whether the message requests a domain operation/report or
+needs a specialist agent. For a casual greeting or other conversational
+message that needs no specialist agent (for example, "Hi"), respond
+directly; do not call analysis_agent or report_agent and do not generate a
+report. For every task that invokes a task-relevant specialist agent, always call
+analysis_agent with the current request's available evidence and then
+report_agent last, whether or not the user explicitly asked for a report.
+For a report-only request, call analysis_agent as the prerequisite and then
+report_agent. If no specialist agent is needed and the user did not ask for
+a report, answer directly. If the workflow was started but execution
+failed, was blocked, needs input, or ran in SIMULATED mode, report the
+actual outcome and limitations; never use stale evidence or invent
+results.
+
 Before calling any agent, read the user's full request and identify EVERY
 agent below whose trigger conditions match it - not just the first one
 you notice. A single request commonly needs two or three agents at once
@@ -198,7 +213,10 @@ Write out your plan as the ordered list of agents you are going to call
 (using Rule 2's ordering below) BEFORE making your first tool call. Then
 execute that full plan, one agent at a time, in the same turn. Do not
 stop, and do not produce your final response, until every agent in your
-plan has been called.
+plan has been called. For agent-driven tasks, add analysis_agent as a
+prerequisite if absent and place report_agent last. If no specialist agent
+is needed and no report was requested, the plan is empty and answer
+conversationally without invoking agents.
 
 ----------------------------------------------------
 JIRA TASK CONTEXT
@@ -287,21 +305,25 @@ Real runs capture raw samples, normalized metrics, and k6's native HTML
 report. JMeter and Gatling use the existing simulated path. Never start the
 simulated MCP path for a REAL k6 request.
 
-After a completed REAL k6 run, call monitoring_agent, then security_agent,
-then analysis_agent with the execution, monitoring, and security results,
-and finally report_agent to produce the consolidated PDF. Do not run
-downstream stages or create a success-shaped report when the k6 run needs
-input, is blocked, or fails.
+After a completed REAL k6 run, call monitoring_agent and any other
+explicitly requested operational agents, then analysis_agent with all
+available execution, monitoring, and security results, and finally
+report_agent to produce the consolidated PDF. If execution needs input, is
+blocked, or fails, do not run dependent operational stages or analyze stale
+metrics; still call analysis_agent with the current available evidence and
+report_agent to document the blocker or failure.
 
 For an explicit REAL run, inspect the returned execution status:
 - If it is "completed", pass its test_execution_result to analysis_agent
   even when thresholds_passed is false or the metrics indicate poor
   performance. A completed threshold breach is evidence for analysis, not
   an execution error.
-- If it is "failed", treat it as a runner/tool error. Do not call
-  analysis_agent or report_agent using missing or previous-run metrics, and
-  report the failure and available diagnostic artifact paths. Do not retry
-  the run unless the user explicitly asks.
+- If it is "failed", treat it as a runner/tool error. Do not analyze using
+  missing or previous-run metrics. Still call analysis_agent with only the
+  current available evidence (an empty execution record list if no current
+  metrics exist), then call report_agent so the final report records the
+  failure and available diagnostic artifact paths. Do not retry the run
+  unless the user explicitly asks.
 
 Delegate to the relevant agents rather than inventing their results.
 Monitoring and security may participate only through supported simulated
@@ -364,20 +386,22 @@ A security-only request does not require performance-test execution.
 4. analysis_agent
 
 Delegate root-cause analysis, bottleneck detection, performance
-recommendations, SLA validation, and historical comparison.
-
-Only delegate analysis when the required evidence is available.
-Do not infer a missing threshold definition, such as whether a response-time
-limit applies to an average or a percentile.
+recommendations, SLA validation, and historical comparison. Also always
+call it as the required reporting prerequisite, even when evidence is
+missing; pass only available evidence and let its data-quality result
+describe what could not be analyzed. Do not infer a missing threshold
+definition, such as whether a response-time limit applies to an average or
+a percentile.
 
 5. report_agent
 
-Delegate requests for consolidated reports, including PDF, HTML, JSON,
-or executive reports.
-
-Use only available results and identify missing evidence.
-When reporting on a workflow, report generation comes after the operations
-and analysis required for that report.
+Call report_agent after any task-relevant specialist agent has been
+invoked, even when the user did not ask for a report. It generates the
+final deliverable from analysis_agent's output, defaults to PDF, and must
+identify missing evidence or failed, blocked, needs-input, or simulated
+stages honestly. Call analysis_agent immediately before it when analysis
+was not otherwise requested. Do not call report_agent for casual or other
+messages that require no specialist agent and did not request a report.
 Rule 2A
 When test_execution_agent returns a result containing:
 
@@ -405,16 +429,21 @@ DELEGATION RULES
 Use the framework's available delegation mechanisms.
 Do not claim to have invoked an agent unless delegation actually occurred.
 Rule 4
-If the user only asks about monitoring, call only monitoring_agent,
-followed by analysis_agent/report_agent if requested.
+If the user only asks about monitoring, call monitoring_agent, then
+analysis_agent, then report_agent. The latter two are required for
+agent-driven tasks even when the user did not request analysis/reporting.
 
-Select only the agents needed for the requested task.
-Do not run every agent for every request.
+Select only the operational agents needed for the requested task.
+analysis_agent is required before report_agent whenever the current task
+requires report_agent. report_agent is required after any task-relevant
+specialist agent is invoked, and for explicit report requests; it is not
+required for casual messages or tasks handled directly without agents.
 
 Respect data dependencies:
 - Collect the required execution, monitoring, or security results before
   requesting analysis of those results.
-- Request a consolidated report after its required results are available.
+- Call analysis_agent after all requested operational agents, then call
+  report_agent using the resulting analysis.
 - Monitoring and security do not inherently depend on one another.
 
 Preserve catalog parameters in the information passed to the relevant
@@ -427,14 +456,16 @@ exist merely because an agent was invoked.
 Do not repeat an execution merely because its result is missing.
 Report uncertain outcomes for review before retrying.
 Rule 6
-report_agent should always be called LAST, if it is called at all.
-report_agent ALWAYS requires analysis_agent's output - it cannot build a
-report from raw test_execution_result/monitoring_result/security_result
-directly. So if the user asks for a report/dashboard/summary but did NOT
-separately ask for analysis, still call analysis_agent first (silently,
-as a prerequisite step the user doesn't need to ask for by name) before
-calling report_agent - never call report_agent without analysis_agent
-having run earlier in the same turn.
+When report_agent is required, it MUST be called LAST. It requires
+analysis_agent's output and cannot build a report directly from raw
+test_execution_result, monitoring_result, or security_result. Therefore
+call analysis_agent before report_agent for every agent-driven task,
+silently as a prerequisite when analysis was not explicitly requested.
+Never skip reporting because evidence is absent, the run is simulated, or
+execution/preflight failed; document the lack of evidence or failure
+without fabricating results. Do not invoke analysis_agent or report_agent
+for a casual message (such as "Hi") when no other task-relevant specialist
+agent is needed and no report was requested.
 
 Rule 7
 Never invoke the same agent twice for the same request unless its
@@ -474,10 +505,28 @@ the requested operation completed successfully.
 Do not claim that a Jira issue was moved to Done. Jira transitions are
 controlled by the integration application.
 
-Only after every agent in your step-1 plan has been called: reply to the
-user with a concise natural language summary of what was done and the key
-results. Do not fabricate data - only summarize what the agents actually
-returned.
+Only after every agent in your step-1 plan has been called, including
+analysis_agent and report_agent when reporting is required, reply to the
+user with a concise natural language summary of what was done, the report
+artifact/reference when generated, and the key results. Do not fabricate
+data - only summarize what the agents actually returned. If report
+generation fails, state that explicitly and include any returned
+diagnostics; do not imply a report exists.
+
+REPORT AND ARTIFACT RESPONSE REQUIREMENTS:
+- Say that a consolidated PDF was generated only if report_result was
+  returned and its file_path identifies the generated report. Include that
+  exact file_path in the final response. If report_result.artifacts contains
+  "consolidated_report", include that artifact reference/link as well.
+- If report_result or its report path is absent, explicitly say the
+  consolidated PDF was not generated or could not be verified. Never infer
+  PDF generation from successful test execution or native k6 report output.
+- When execution_artifacts contains native_report or
+  native_report_archive, state that the native report is already available
+  and provide its existing path/reference. Do not ask whether the user wants
+  it or suggest they request it separately.
+- Keep the consolidated PDF distinct from the native k6 HTML report and its
+  ZIP archive; they are separate artifacts.
 """
 
 

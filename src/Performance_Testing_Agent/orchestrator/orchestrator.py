@@ -1,5 +1,5 @@
-import uuid
 import os
+import uuid
 from pathlib import Path
 
 from google.adk.runners import Runner
@@ -21,8 +21,15 @@ from Performance_Testing_Agent.artifact_store import (
     write_artifact_manifest,
 )
 
-from .agent import root_agent
+from .agent import (
+    analysis_agent,
+    monitoring_agent,
+    report_agent,
+    root_agent,
+    security_agent,
+)
 from .logger import logger
+from .pipeline import complete_real_k6_pipeline, json_object
 
 ADK_APP_NAME = "performance_testing_agent"
 
@@ -53,6 +60,76 @@ class Orchestrator:
             app_name=ADK_APP_NAME,
             session_service=self.session_service,
         )
+
+    async def _get_state(self, user_id: str, session_id: str) -> dict:
+        session = await self.session_service.get_session(
+            app_name=ADK_APP_NAME,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        return dict(session.state) if session else {}
+
+    async def _invoke_agent(
+        self,
+        agent,
+        *,
+        user_id: str,
+        session_id: str,
+        message: str,
+    ) -> str | None:
+        """Run one specialist against the current shared session state."""
+        runner = Runner(
+            agent=agent,
+            app_name=ADK_APP_NAME,
+            session_service=self.session_service,
+        )
+        content = genai_types.Content(
+            role="user",
+            parts=[genai_types.Part(text=message)],
+        )
+        final_text = None
+        async for event in runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=content,
+        ):
+            if event.is_final_response() and event.content and event.content.parts:
+                text_parts = [part.text for part in event.content.parts if part.text]
+                if text_parts:
+                    final_text = "\n".join(text_parts)
+        return final_text
+
+    async def _complete_real_k6_pipeline(
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        user_query: str,
+        state: dict,
+        agents_called: list[str],
+    ) -> tuple[dict, dict] | None:
+        async def invoke_and_refresh(agent, message: str) -> None:
+            await self._invoke_agent(
+                agent,
+                user_id=user_id,
+                session_id=session_id,
+                message=message,
+            )
+            refreshed = await self._get_state(user_id, session_id)
+            state.clear()
+            state.update(refreshed)
+
+        pipeline = await complete_real_k6_pipeline(
+            state=state,
+            user_query=user_query,
+            invoke_agent=invoke_and_refresh,
+            monitoring_agent=monitoring_agent,
+            security_agent=security_agent,
+            analysis_agent=analysis_agent,
+            report_agent=report_agent,
+            agents_called=agents_called,
+        )
+        return (state, pipeline) if pipeline is not None else None
 
     async def execute(
         self,
@@ -126,12 +203,35 @@ class Orchestrator:
         # Pull the authoritative structured results back out of shared
         # session state - this is where each specialist agent's tool
         # (agents/*.py) actually wrote its exact numbers.
-        session = await self.session_service.get_session(
-            app_name=ADK_APP_NAME,
+        state = await self._get_state(user_id, session_id)
+
+        pipeline_result = await self._complete_real_k6_pipeline(
             user_id=user_id,
             session_id=session_id,
+            user_query=user_query,
+            state=state,
+            agents_called=agents_called,
         )
-        state = dict(session.state) if session else {}
+        if pipeline_result is not None:
+            state, pipeline_status = pipeline_result
+            report_payload = json_object(state.get("report_result"))
+            if report_payload is not None:
+                state["report_result"] = report_payload
+                if report_payload.get("file_path"):
+                    final_text = (
+                        "REAL k6 pipeline completed. Final report: "
+                        f"{report_payload['file_path']}"
+                    )
+                else:
+                    final_text = (
+                        "REAL k6 pipeline completed, but the report agent "
+                        "did not return a report file path."
+                    )
+            elif "report" in pipeline_status:
+                final_text = (
+                    "REAL k6 pipeline did not complete report generation. "
+                    f"Stage status: {pipeline_status['report']}"
+                )
 
         logger.info(f"Agents called: {agents_called}")
         logger.info("Orchestrator run complete")
@@ -142,7 +242,7 @@ class Orchestrator:
             if isinstance(artifact_manifest, dict)
             else {}
         )
-        report = state.get("report_result")
+        report = json_object(state.get("report_result"))
         report_artifacts = (
             report.get("artifacts", {})
             if isinstance(report, dict)
@@ -201,6 +301,7 @@ class Orchestrator:
                 "job_id": job_id,
                 "execution_mode": execution_mode,
                 "status": state.get("execution_status", "not_started"),
+                "pipeline_stages": state.get("real_k6_pipeline"),
                 "artifact_directory": (
                     artifact_directory_reference(job_id)
                     if job_id
@@ -229,6 +330,7 @@ class Orchestrator:
                 "job_id": job_id,
                 "execution_mode": execution_mode,
                 "status": state.get("execution_status", "not_started"),
+                "pipeline_stages": state.get("real_k6_pipeline"),
                 "artifact_directory": (
                     artifact_directory_reference(job_id)
                     if job_id

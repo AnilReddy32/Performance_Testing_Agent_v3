@@ -1,9 +1,12 @@
 import sys
+import re
 from pathlib import Path
 
 from google.adk.agents import LlmAgent
+from google.adk.agents.context import Context
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools import AgentTool
+from google.genai import types as genai_types
 
 from ..config import LITELLM_MODEL_NAME, TEMPERATURE
 
@@ -33,11 +36,81 @@ from ..agents.Analysis_Report_agent_adk.app.agents.analysis.agent import analysi
 from ..agents.Analysis_Report_agent_adk.app.agents.report.agent import report_agent
 
 from .prompts import ORCHESTRATOR_SYSTEM_PROMPT
+from .pipeline import complete_real_k6_pipeline, json_object
 from .tools import (
     bind_explicit_catalog_case,
     load_catalog_test_case,
     record_test_case_prompt,
 )
+
+
+_PIPELINE_REQUEST = re.compile(
+    r"\b(?:run|execute|monitor|analy[sz]e?|report|pdf|test case)\b|"
+    r"\b(?:PTC|WTC)-\d{3}\b",
+    re.IGNORECASE,
+)
+
+
+async def _complete_real_k6_pipeline_for_adk_web(
+    callback_context: Context,
+) -> genai_types.Content | None:
+    """Complete missing REAL k6 stages when ADK Web runs root_agent directly.
+
+    FastAPI uses the same completion function from Orchestrator.execute. This
+    callback covers ADK Web's direct root_agent entry point and skips
+    current-job results already produced by the LLM delegation path.
+    """
+    user_content = callback_context.user_content
+    user_query = "\n".join(
+        part.text for part in user_content.parts if part.text
+    ) if user_content and user_content.parts else ""
+    if not user_query or not _PIPELINE_REQUEST.search(user_query):
+        return None
+
+    async def invoke_agent(agent, message: str) -> None:
+        # ADK's workflow wrapper mutates an LlmAgent with mode=None to
+        # single_turn. Use a shallow model copy so AgentTool's shared agent
+        # instance keeps its existing configuration for future turns.
+        agent_node = agent.model_copy(update={"mode": "single_turn"})
+        await callback_context.run_node(agent_node, node_input=message)
+
+    pipeline = await complete_real_k6_pipeline(
+        state=callback_context.state,
+        user_query=user_query,
+        invoke_agent=invoke_agent,
+        monitoring_agent=monitoring_agent,
+        security_agent=security_agent,
+        analysis_agent=analysis_agent,
+        report_agent=report_agent,
+    )
+    if pipeline is None:
+        return None
+
+    # If the LLM already completed every stage, preserve its natural-language
+    # answer. When this callback had to fill a stage, make that completion
+    # visible in ADK Web's final response.
+    if all(
+        status == "already_available" or status.startswith("skipped:")
+        for status in pipeline.values()
+    ):
+        return None
+
+    report_result = json_object(callback_context.state.get("report_result"))
+    report_path = report_result.get("file_path") if report_result else None
+    if isinstance(report_path, str) and report_path:
+        message = f"REAL k6 pipeline completed. Final report: {report_path}"
+    else:
+        stage_summary = ", ".join(
+            f"{stage}={status}" for stage, status in pipeline.items()
+        )
+        message = (
+            "REAL k6 pipeline finished with an incomplete report stage. "
+            f"Stage status: {stage_summary}"
+        )
+    return genai_types.Content(
+        role="model",
+        parts=[genai_types.Part(text=message)],
+    )
 
 
 
@@ -64,6 +137,7 @@ def build_orchestrator_agent() -> LlmAgent:
         ),
         instruction=ORCHESTRATOR_SYSTEM_PROMPT,
         before_agent_callback=bind_explicit_catalog_case,
+        after_agent_callback=_complete_real_k6_pipeline_for_adk_web,
         description=(
             "Orchestrates the test-execution, monitoring, security, "
             "analysis and reporting sub-agents for a banking application."

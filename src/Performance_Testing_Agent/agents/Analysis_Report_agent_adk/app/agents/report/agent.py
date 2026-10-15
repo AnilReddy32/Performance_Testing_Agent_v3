@@ -80,6 +80,14 @@ Follow this exact sequence:
    answer (NOT the ingestion result -- that's a side effect, not the
    report), with no added commentary.
 
+The returned object includes the generated report's `file_path` and any
+registered artifact references in `artifacts`. Preserve these exact values;
+never claim a report was generated if `finalize_report` did not return a
+path. When `execution_artifacts` includes `native_report` or
+`native_report_archive`, these are already-generated execution artifacts.
+Include their existing paths in the report content where available; never
+ask whether the user wants them or ask them to request them separately.
+
 Rules:
 - Never invent findings, metrics, infra data, or security recommendations
   that weren't present in {analysis_result}.
