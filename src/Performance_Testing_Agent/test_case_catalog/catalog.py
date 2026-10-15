@@ -2,6 +2,10 @@ import json
 from pathlib import Path
 from typing import Any
 
+from Performance_Testing_Agent.execution_context import (
+    workload_profile_from_test_case,
+)
+
 
 CATALOG_DIRECTORY = Path(__file__).resolve().parent
 
@@ -49,6 +53,22 @@ def load_test_cases() -> list[dict[str, Any]]:
                     f"Found in {seen_ids[test_case_id]} "
                     f"and {catalog_path.name}."
                 )
+
+            execution_mode = str(
+                test_case.get("execution_mode", "SIMULATED")
+            ).strip().upper()
+            if execution_mode not in {"REAL", "SIMULATED"}:
+                raise ValueError(
+                    f"{catalog_path.name}: {test_case_id} has invalid "
+                    "execution_mode; expected REAL or SIMULATED."
+                )
+
+            test_case["execution_mode"] = execution_mode
+            test_case["workload_profile"] = (
+                workload_profile_from_test_case(test_case).model_dump(
+                    mode="json"
+                )
+            )
 
             seen_ids[test_case_id] = catalog_path.name
             all_test_cases.append(test_case)

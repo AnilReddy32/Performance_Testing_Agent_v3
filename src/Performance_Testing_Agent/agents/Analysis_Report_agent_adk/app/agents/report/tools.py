@@ -20,13 +20,23 @@ machine.
 """
 
 import logging
+import math
 import os
+import shutil
+import tempfile
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
+from xml.sax.saxutils import escape
 
 from google.adk.tools import ToolContext
 from google.genai import types as genai_types
+
+from Performance_Testing_Agent.execution_context import (
+    artifact_directory_reference,
+    resolve_artifact_directory,
+)
 
 from .schemas import ReportOutput, ReportSection
 
@@ -95,17 +105,42 @@ def _build_agent_activity_rows(
         rows.append(("Test Execution", "No test execution data was available for this job."))
 
     if infra_health:
-        mon_text = (
-            f"CPU usage: {infra_health.get('cpu_usage')}%, "
-            f"Memory: {infra_health.get('memory_usage')}%, "
-            f"DB connections: {infra_health.get('db_connections')}, "
-            f"TPS: {infra_health.get('tps')}, "
-            f"Response time: {infra_health.get('monitoring_response_time')} ms.\n"
-        )
-        mon_text += (
-            f"Alerts triggered: {infra_health['alerts']}"
-            if infra_health.get("alerts") else "No alerts triggered."
-        )
+        db_connections = infra_health.get("db_connections")
+        cpu_peak = infra_health.get("cpu_peak_usage")
+        memory_peak = infra_health.get("memory_peak_usage")
+        if infra_health.get("monitoring_reported_status") == "UNAVAILABLE":
+            mon_text = "Monitoring unavailable; no metrics were substituted."
+            if infra_health.get("data_source"):
+                mon_text += f" {infra_health['data_source']}."
+            if infra_health.get("anomalies"):
+                mon_text += " " + "; ".join(infra_health["anomalies"])
+        else:
+            cpu_summary = f"{infra_health.get('cpu_usage')}% average"
+            memory_summary = f"{infra_health.get('memory_usage')}% average"
+            if cpu_peak is not None:
+                cpu_summary += f", {cpu_peak}% peak"
+            if memory_peak is not None:
+                memory_summary += f", {memory_peak}% peak"
+            mon_text = (
+                f"CPU usage: {cpu_summary}; "
+                f"memory: {memory_summary}; "
+                f"DB connections: {db_connections if db_connections is not None else 'not collected'}, "
+                f"TPS: {infra_health.get('tps')}, "
+                f"Response time: {infra_health.get('monitoring_response_time')} ms.\n"
+            )
+            if infra_health.get("data_source"):
+                mon_text += f"Data source and scope: {infra_health['data_source']}.\n"
+            provenance = infra_health.get("measurement_provenance", {})
+            if provenance:
+                mon_text += "Measurement provenance: " + "; ".join(
+                    f"{metric}={details.get('data_source') or details.get('status', 'unknown')} "
+                    f"({details.get('measurement_scope') or details.get('reason', 'scope unavailable')})"
+                    for metric, details in provenance.items()
+                ) + ".\n"
+            mon_text += (
+                f"Alerts triggered: {infra_health['alerts']}"
+                if infra_health.get("alerts") else "No alerts triggered."
+            )
     else:
         mon_text = "Monitoring was not run for this job."
     rows.append(("Monitoring", mon_text))
@@ -162,6 +197,90 @@ def _build_agent_activity_summary(
     return "\n".join(lines).rstrip()
 
 
+def _package_native_execution_artifacts(
+    job_id: str,
+    execution_mode: Optional[str],
+    execution_artifacts: Optional[dict[str, str]],
+) -> dict[str, str]:
+    """Package the current REAL run's native HTML report and raw k6 results."""
+    if (execution_mode or "").upper() != "REAL":
+        return {}
+    artifacts = execution_artifacts or {}
+    native_name = artifacts.get("native_report")
+    raw_name = artifacts.get("raw_results")
+    if not native_name and not raw_name:
+        return {}
+
+    job_directory = resolve_artifact_directory(job_id)
+    source_paths: dict[str, Path] = {}
+    for artifact_key, artifact_name in (
+        ("native_report", native_name),
+        ("raw_results", raw_name),
+    ):
+        if not artifact_name:
+            continue
+        if Path(artifact_name).name != artifact_name:
+            raise ValueError(
+                f"Execution artifact '{artifact_key}' must be a job-local filename."
+            )
+        source_path = (job_directory / artifact_name).resolve()
+        if source_path.parent != job_directory or not source_path.is_file():
+            raise ValueError(
+                f"Execution artifact '{artifact_key}' is missing or outside "
+                "the current job directory."
+            )
+        source_paths[artifact_key] = source_path
+
+    references = {
+        artifact_key: source_path.name
+        for artifact_key, source_path in source_paths.items()
+    }
+    if len(source_paths) != 2:
+        return references
+
+    archive_path = job_directory / f"{job_id}_native_report.zip"
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{job_id}_native_report_",
+            suffix=".tmp",
+            dir=job_directory,
+            delete=False,
+        ) as temporary_file:
+            temporary_path = Path(temporary_file.name)
+        with zipfile.ZipFile(
+            temporary_path,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+        ) as archive:
+            archive.write(
+                source_paths["native_report"],
+                arcname=f"native_report/{native_name}",
+            )
+            archive.write(
+                source_paths["raw_results"],
+                arcname=f"raw_results/{raw_name}",
+            )
+        temporary_path.replace(archive_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+    references["native_report_archive"] = archive_path.name
+    return references
+
+
+def _artifact_download_url(job_id: str, artifact_key: str) -> str:
+    base_url = os.getenv("ARTIFACT_PUBLIC_BASE_URL", "").rstrip("/")
+    relative_url = f"/artifacts/{job_id}/{artifact_key}"
+    return f"{base_url}{relative_url}" if base_url else relative_url
+
+
+def _artifact_link(label: str, url: str) -> str:
+    href = escape(url, {'"': "&quot;"})
+    return f'<link href="{href}">{escape(label)}</link>'
+
+
 def build_report_sections(
     job_id: str,
     application: str,
@@ -175,6 +294,11 @@ def build_report_sections(
     summary: str,
     test_case_prompt: Optional[str] = None,
     requested_format: str = "pdf",
+    time_series_analysis: Optional[dict] = None,
+    execution_mode: Optional[str] = None,
+    execution_profile: Optional[dict] = None,
+    execution_artifact_directory: Optional[str] = None,
+    execution_artifacts: Optional[dict[str, str]] = None,
 ) -> dict:
     """Builds the ordered list of report sections. Returns
     {"sections": [...], "rejected": bool}.
@@ -203,6 +327,44 @@ def build_report_sections(
         })
         return {"sections": sections, "rejected": True}
 
+    chart_series = (
+        time_series_analysis.get("series", [])
+        if isinstance(time_series_analysis, dict)
+        and time_series_analysis.get("status") == "analyzed"
+        and time_series_analysis.get("execution_mode") == "REAL"
+        and isinstance(time_series_analysis.get("series"), list)
+        else []
+    )
+    charts = []
+    for metric, title, unit in (
+        ("avg_response_time_ms", "Response latency over time", "ms"),
+        ("throughput_rps", "Throughput over time", "requests/second"),
+        ("cpu_avg_percent", "Load-generator host CPU over time", "%"),
+    ):
+        points = [
+            {
+                "elapsed_seconds": point.get("elapsed_seconds"),
+                "value": point.get(metric),
+            }
+            for point in chart_series
+            if isinstance(point, dict)
+            and isinstance(point.get("elapsed_seconds"), (int, float))
+            and isinstance(point.get(metric), (int, float))
+        ]
+        if points:
+            charts.append(
+                {
+                    "title": title,
+                    "unit": unit,
+                    "points": points,
+                    "data_source": (
+                        "psutil load-generator host"
+                        if metric == "cpu_avg_percent"
+                        else "k6 client-observed HTTP traffic"
+                    ),
+                }
+            )
+
     sections.append({
         "title": "Executive Summary",
         "content": (
@@ -213,6 +375,104 @@ def build_report_sections(
             f"{summary or 'No summary provided.'}"
         ),
     })
+
+    packaged_references = _package_native_execution_artifacts(
+        job_id,
+        execution_mode,
+        execution_artifacts,
+    )
+    report_artifacts = dict(execution_artifacts or {})
+    report_artifacts.update(packaged_references)
+    report_artifact_directory = execution_artifact_directory
+    if (execution_mode or "").upper() == "REAL":
+        report_artifact_directory = artifact_directory_reference(job_id)
+    execution_lines = [
+        f"Execution mode: {(execution_mode or 'UNKNOWN').upper()}",
+    ]
+    if execution_profile:
+        execution_lines.append("Workload profile:")
+        execution_lines.extend(
+            f"  - {field}: {value}"
+            for field, value in execution_profile.items()
+        )
+    else:
+        execution_lines.append("Workload profile: not recorded.")
+    if report_artifact_directory:
+        execution_lines.append(
+            f"Artifact directory: {report_artifact_directory}"
+        )
+    artifact_references = report_artifacts
+    if artifact_references:
+        execution_lines.append("Artifact references:")
+        for artifact_name, artifact_path in sorted(artifact_references.items()):
+            if report_artifact_directory and not os.path.isabs(artifact_path):
+                reference = os.path.join(
+                    report_artifact_directory,
+                    artifact_path,
+                ).replace(os.sep, "/")
+            else:
+                reference = artifact_path
+            if artifact_name in {
+                "native_report",
+                "raw_results",
+                "native_report_archive",
+            }:
+                label = {
+                    "native_report": "Native k6 HTML report",
+                    "raw_results": "Raw k6 results (JSON)",
+                    "native_report_archive": (
+                        "Native report + raw results ZIP"
+                    ),
+                }[artifact_name]
+                artifact_url = _artifact_download_url(job_id, artifact_name)
+                execution_lines.append(
+                    f"  - {_artifact_link(label, artifact_url)}"
+                )
+            else:
+                execution_lines.append(f"  - {artifact_name}: {reference}")
+        if packaged_references:
+            execution_lines.append(
+                "The interactive HTML dashboard is linked as a separate "
+                "artifact and is not embedded in this PDF."
+            )
+        if (
+            (execution_mode or "").upper() == "REAL"
+            and "native_report_archive" not in packaged_references
+        ):
+            execution_lines.append(
+                "Native report package unavailable: the execution manifest "
+                "does not contain both the native report and raw results."
+            )
+    else:
+        execution_lines.append("Artifact references: none recorded.")
+    sections.append(
+        {
+            "title": "Execution Profile and Artifacts",
+            "content": "\n".join(execution_lines),
+        }
+    )
+    if charts:
+        sections.append(
+            {
+                "title": "Time-Series Charts (REAL Measurements)",
+                "content": (
+                    "Charts show measured values in five-second aligned "
+                    "buckets. Host CPU is from the load-generator machine, "
+                    "not the target."
+                ),
+                "charts": charts,
+            }
+        )
+    elif (execution_mode or "").upper() == "SIMULATED":
+        sections.append(
+            {
+                "title": "Time-Series Charts",
+                "content": (
+                    "No time-series graphs are available: simulated runs do "
+                    "not produce measured time-series data."
+                ),
+            }
+        )
 
     activity_rows = _build_agent_activity_rows(
         application, scenario, api_findings, infra_health,
@@ -357,7 +617,91 @@ async def render_pdf_report(job_id: str, sections: List[dict], tool_context: Too
     from reportlab.lib.pagesizes import LETTER
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.platypus import (
+        Flowable,
+        SimpleDocTemplate,
+        Paragraph,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    class TimeSeriesChart(Flowable):
+        def __init__(self, chart: dict):
+            super().__init__()
+            self.title = str(chart["title"])
+            self.unit = str(chart["unit"])
+            self.data_source = str(chart["data_source"])
+            self.points = [
+                (float(point["elapsed_seconds"]), float(point["value"]))
+                for point in chart["points"][:1000]
+                if isinstance(point, dict)
+                and isinstance(point.get("elapsed_seconds"), (int, float))
+                and isinstance(point.get("value"), (int, float))
+                and math.isfinite(float(point["elapsed_seconds"]))
+                and math.isfinite(float(point["value"]))
+            ]
+            self.width = 450
+            self.height = 190
+
+        def wrap(self, available_width, available_height):
+            self.width = min(450, available_width)
+            return self.width, self.height
+
+        def draw(self):
+            if not self.points:
+                return
+            canvas = self.canv
+            left, right, bottom, top = 48, self.width - 12, 35, self.height - 25
+            x_values = [point[0] for point in self.points]
+            y_values = [point[1] for point in self.points]
+            x_min, x_max = min(x_values), max(x_values)
+            y_min, y_max = min(0.0, min(y_values)), max(y_values)
+            if x_min == x_max:
+                x_max = x_min + 1
+            if y_min == y_max:
+                y_max = y_min + 1
+
+            canvas.saveState()
+            canvas.setFont("Helvetica-Bold", 10)
+            canvas.drawString(left, self.height - 13, self.title)
+            canvas.setFont("Helvetica", 7)
+            canvas.setFillColor(colors.HexColor("#555555"))
+            canvas.drawRightString(right, self.height - 13, self.data_source)
+            canvas.setStrokeColor(colors.HexColor("#cccccc"))
+            canvas.setLineWidth(0.5)
+            for tick in range(5):
+                y = bottom + (top - bottom) * tick / 4
+                value = y_min + (y_max - y_min) * tick / 4
+                canvas.line(left, y, right, y)
+                canvas.setFont("Helvetica", 7)
+                canvas.drawRightString(left - 5, y - 2, f"{value:.2f}")
+            canvas.setStrokeColor(colors.HexColor("#334e68"))
+            canvas.setLineWidth(1.5)
+            mapped_points = [
+                (
+                    left + (x - x_min) / (x_max - x_min) * (right - left),
+                    bottom + (y - y_min) / (y_max - y_min) * (top - bottom),
+                )
+                for x, y in self.points
+            ]
+            if len(mapped_points) == 1:
+                x, y = mapped_points[0]
+                canvas.circle(x, y, 2, stroke=1, fill=1)
+            else:
+                path = canvas.beginPath()
+                path.moveTo(*mapped_points[0])
+                for x, y in mapped_points[1:]:
+                    path.lineTo(x, y)
+                canvas.drawPath(path)
+            canvas.setStrokeColor(colors.black)
+            canvas.setLineWidth(0.7)
+            canvas.line(left, bottom, left, top)
+            canvas.line(left, bottom, right, bottom)
+            canvas.setFont("Helvetica", 7)
+            canvas.drawString(left, 17, f"Elapsed time (s); values in {self.unit}")
+            canvas.drawRightString(right, 17, f"{x_min:g} - {x_max:g} s")
+            canvas.restoreState()
 
     os.makedirs(REPORTS_DIR, exist_ok=True)
     local_path = os.path.join(REPORTS_DIR, f"{job_id}_report.pdf")
@@ -394,6 +738,10 @@ async def render_pdf_report(job_id: str, sections: List[dict], tool_context: Too
         else:
             for line in s["content"].split("\n"):
                 story.append(Paragraph(line if line.strip() else "&nbsp;", styles["Normal"]))
+
+        for chart in s.get("charts", []):
+            story.append(Spacer(1, 0.1 * inch))
+            story.append(TimeSeriesChart(chart))
 
         story.append(Spacer(1, 0.2 * inch))
 
@@ -467,11 +815,27 @@ async def finalize_report(
         file_path = await render_pdf_report(job_id, sections, tool_context)
         fmt = "both" if want_txt else "pdf"
 
+    report_artifacts: dict[str, str] = {}
+    if not rejected and job_id.startswith("JOB-"):
+        local_pdf = Path(REPORTS_DIR) / f"{job_id}_report.pdf"
+        if local_pdf.is_file():
+            job_directory = resolve_artifact_directory(job_id)
+            job_directory.mkdir(parents=True, exist_ok=True)
+            consolidated_pdf = job_directory / f"{job_id}_report.pdf"
+            shutil.copy2(local_pdf, consolidated_pdf)
+            report_artifacts["consolidated_report"] = consolidated_pdf.name
+        native_archive = (
+            resolve_artifact_directory(job_id) / f"{job_id}_native_report.zip"
+        )
+        if native_archive.is_file():
+            report_artifacts["native_report_archive"] = native_archive.name
+
     output = ReportOutput(
         job_id=job_id, application=application, scenario=scenario,
         overall_status=overall_status, report_format=fmt, file_path=file_path,
         generated_at=datetime.now(timezone.utc).isoformat(),
         sections=[ReportSection(**s) for s in sections], rejected=rejected,
+        artifacts=report_artifacts,
     )
     return output.model_dump()
 

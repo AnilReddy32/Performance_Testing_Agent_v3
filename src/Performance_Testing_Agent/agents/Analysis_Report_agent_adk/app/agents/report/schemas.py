@@ -34,3 +34,4 @@ class ReportOutput(BaseModel):
     generated_at: str
     sections: List[ReportSection] = Field(default_factory=list)
     rejected: bool = False  # true when the underlying analysis was invalid
+    artifacts: dict[str, str] = Field(default_factory=dict)

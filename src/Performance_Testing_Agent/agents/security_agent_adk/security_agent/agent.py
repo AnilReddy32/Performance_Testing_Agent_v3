@@ -5,6 +5,7 @@ from google.adk.apps import App
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools import AgentTool
 
+from Performance_Testing_Agent.config import LITELLM_MODEL_NAME
 from security_agent.config import settings
 from security_agent.tools.api_tool import get_api_information
 from security_agent.tools.profile_tool import get_application_profile
@@ -43,15 +44,9 @@ if not settings.OPENAI_MODEL:
 # tool_context.state writes such as finalize_assessment's security_result
 # still land on the real session exactly as before.
 #
-# mode='chat' is required here (not 'single_turn'): AgentTool runs this
-# agent as the root of its own nested Runner, and Runner.run_async only
-# accepts a directly-run LlmAgent whose mode is 'chat' or 'task'.
 security_operations_agent = LlmAgent(
     name="security_operations_agent",
-    model=LiteLlm(
-        model=settings.OPENAI_MODEL,
-    ),
-    mode="chat",
+    model=LiteLlm(model=LITELLM_MODEL_NAME),
     description=(
         "Runs the full application and API security assessment workflow "
         "(evidence retrieval, deterministic validators, and assessment "
@@ -85,10 +80,7 @@ security_operations_agent = LlmAgent(
 
 root_agent = LlmAgent(
     name="security_agent",
-    model=LiteLlm(
-        model=settings.OPENAI_MODEL,
-    ),
-    mode = "single_turn",
+    model=LiteLlm(model=LITELLM_MODEL_NAME),
     description=(
         "Production-grade Security Agent responsible for "
         "application and API security assessment."

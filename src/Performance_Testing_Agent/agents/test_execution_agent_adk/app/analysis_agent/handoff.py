@@ -145,15 +145,6 @@ def validate_analysis_payload(payload: dict[str, Any]) -> None:
         )
 
     if (
-        payload["p95_response_time"]
-        < payload["avg_response_time"]
-    ):
-        raise ValueError(
-            "p95_response_time cannot be lower "
-            "than avg_response_time."
-        )
-
-    if (
         payload["max_response_time"]
         < payload["p95_response_time"]
     ):

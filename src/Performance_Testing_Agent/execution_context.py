@@ -1,0 +1,651 @@
+from __future__ import annotations
+
+import ipaddress
+import os
+import re
+import socket
+import uuid
+from pathlib import Path
+from typing import Any, Literal
+from urllib.parse import unquote, urlsplit
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+
+ExecutionMode = Literal["REAL", "SIMULATED"]
+ArtifactKey = Literal[
+    "generated_script",
+    "test_data",
+    "environment",
+    "raw_results",
+    "k6_summary",
+    "normalized_metrics",
+    "time_series",
+    "aligned_time_series",
+    "monitoring_samples",
+    "measurement_metadata",
+    "native_report",
+    "native_report_archive",
+    "runner_log",
+    "consolidated_report",
+]
+ExecutionStatus = Literal[
+    "not_started",
+    "needs_input",
+    "blocked",
+    "prepared",
+    "running",
+    "completed",
+    "failed",
+]
+PreflightStatus = Literal[
+    "not_required",
+    "needs_input",
+    "blocked",
+    "rejected",
+    "ready",
+]
+
+_PROFILE_FIELD_NAMES = (
+    "tool",
+    "target_url",
+    "environment",
+    "endpoint",
+    "method",
+    "users",
+    "max_rps",
+    "duration_seconds",
+    "ramp_up_seconds",
+    "p95_threshold_ms",
+    "expected_status_code",
+    "credentials_ref",
+)
+_BODY_METHODS = {"POST", "PUT", "PATCH"}
+_K6_TASK_PATTERN = re.compile(
+    r"\bk6\b.*\b(?:test|testing|script|scenario|workload|load|run|execute|"
+    r"generate|create|prepare)\b|\b(?:test|testing|script|scenario|workload|"
+    r"load|run|execute|generate|create|prepare)\b.*\bk6\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_SIMULATED_TOOL_TASK_PATTERN = re.compile(
+    r"\b(?:jmeter|gatling)\b.*\b(?:test|testing|script|scenario|workload|"
+    r"load|run|execute|generate|create|prepare)\b|\b(?:test|testing|script|"
+    r"scenario|workload|load|run|execute|generate|create|prepare)\b.*"
+    r"\b(?:jmeter|gatling)\b",
+    re.IGNORECASE | re.DOTALL,
+)
+_CATALOG_TEST_CASE_ID_PATTERN = re.compile(r"\b(?:PTC|WTC)-\d{3}\b", re.I)
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_ARTIFACTS_ROOT = (
+    _PROJECT_ROOT / "src" / "generated_scripts" / "artifacts"
+)
+_JOB_ID_PATTERN = re.compile(r"JOB-[0-9a-f]{32}")
+
+
+class WorkloadProfile(BaseModel):
+    """Validated, non-secret inputs required to define a test workload."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        strict=True,
+        str_strip_whitespace=True,
+    )
+
+    tool: Literal["k6", "jmeter", "gatling"] | None = None
+    target_url: str | None = None
+    environment: Literal["mock_api"] | None = None
+    endpoint: str | None = None
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] | None = None
+    payload_template: dict[str, Any] | list[Any] | None = None
+    expected_status_code: int | None = Field(default=None, ge=100, le=599)
+    users: int | None = Field(default=None, ge=1)
+    max_rps: int | None = Field(default=None, ge=1)
+    duration_seconds: int | None = Field(default=None, ge=1)
+    ramp_up_seconds: int | None = Field(default=None, ge=1)
+    expected_response_time_ms: int | None = Field(default=None, ge=1)
+    p95_threshold_ms: int | None = Field(default=None, ge=1)
+    credentials_ref: str | None = None
+
+
+class ExecutionArtifactManifest(BaseModel):
+    """Stable artifact-key contract shared by runners, reports, and callers."""
+
+    job_id: str
+    execution_mode: ExecutionMode
+    artifacts: dict[ArtifactKey, str] = Field(default_factory=dict)
+
+
+class ExecutionPreflight(BaseModel):
+    status: PreflightStatus
+    missing_inputs: list[str] = Field(default_factory=list)
+    blocked_reasons: list[str] = Field(default_factory=list)
+
+
+class ExecutionJobContext(BaseModel):
+    job_id: str
+    execution_mode: ExecutionMode
+    workload_profile: WorkloadProfile | None = None
+    execution_preflight: ExecutionPreflight
+    execution_status: ExecutionStatus
+    execution_artifact_directory: str
+    execution_artifacts: ExecutionArtifactManifest
+    execution_source_id: str | None = None
+    test_case_id: str | None = None
+    test_case_name: str | None = None
+
+
+class ExecutionJobResult(BaseModel):
+    """Structured execution-stage result; paths are relative to the job folder."""
+
+    job_id: str
+    execution_mode: ExecutionMode
+    status: ExecutionStatus
+    message: str
+    missing_inputs: list[str] = Field(default_factory=list)
+    blocked_reasons: list[str] = Field(default_factory=list)
+    artifacts: dict[ArtifactKey, str] = Field(default_factory=dict)
+
+
+def real_execution_gate(state: dict[str, Any]) -> dict[str, Any]:
+    """Return a fail-closed REAL-mode response without invoking any runner."""
+    job_id = state.get("job_id")
+    if not isinstance(job_id, str) or not job_id:
+        raise ValueError("REAL execution context is missing a valid job_id.")
+
+    preflight = state.get("execution_preflight")
+    if not isinstance(preflight, dict):
+        preflight = {}
+    preflight_status = preflight.get("status")
+
+    if preflight_status == "needs_input":
+        missing_inputs = preflight.get("missing_inputs")
+        if (
+            not isinstance(missing_inputs, list)
+            or not missing_inputs
+            or not all(isinstance(item, str) and item for item in missing_inputs)
+        ):
+            raise ValueError("REAL execution preflight has invalid missing_inputs.")
+        result = ExecutionJobResult(
+            job_id=job_id,
+            execution_mode="REAL",
+            status="needs_input",
+            message=(
+                "Real execution was not started. Provide the missing "
+                "workload profile values: "
+                + ", ".join(missing_inputs)
+                + "."
+            ),
+            missing_inputs=missing_inputs,
+        )
+    else:
+        blocked_reasons = preflight.get("blocked_reasons")
+        if not isinstance(blocked_reasons, list) or not all(
+            isinstance(reason, str) for reason in blocked_reasons
+        ):
+            blocked_reasons = []
+        if preflight_status == "ready":
+            blocked_reasons = [
+                "A ready REAL preflight must include a valid workload profile."
+            ]
+        elif preflight_status not in {"blocked", "rejected"}:
+            blocked_reasons = [
+                "Real execution preflight is missing or invalid."
+            ]
+        elif not blocked_reasons:
+            blocked_reasons = [
+                "REAL execution preflight was blocked without a reason."
+            ]
+        result = ExecutionJobResult(
+            job_id=job_id,
+            execution_mode="REAL",
+            status="blocked",
+            message=(
+                "Real execution was not started. "
+                "No simulated fallback was run."
+            ),
+            blocked_reasons=blocked_reasons,
+        )
+    return result.model_dump(mode="json")
+
+
+def _catalog_profile_data(test_case: dict[str, Any]) -> dict[str, Any]:
+    """Adapt the existing flat performance-test catalog to the profile schema."""
+    profile = test_case.get("workload_profile")
+    if profile is not None:
+        if not isinstance(profile, dict):
+            raise ValueError("workload_profile must be an object.")
+        return profile
+
+    raw_method = test_case.get("method")
+    return {
+        "tool": test_case.get("tool"),
+        "target_url": test_case.get("target_url"),
+        "environment": test_case.get("environment"),
+        "endpoint": test_case.get("endpoint"),
+        "method": (
+            raw_method.strip().upper()
+            if isinstance(raw_method, str) and raw_method.strip()
+            else None
+        ),
+        "payload_template": test_case.get("payload_template"),
+        "expected_status_code": test_case.get(
+            "expected_status_code",
+            test_case.get("expected_status"),
+        ),
+        "users": test_case.get("users", test_case.get("virtual_users")),
+        "max_rps": test_case.get("max_rps"),
+        "duration_seconds": test_case.get(
+            "duration_seconds",
+            test_case.get("duration"),
+        ),
+        "ramp_up_seconds": test_case.get(
+            "ramp_up_seconds",
+            test_case.get("ramp_up"),
+        ),
+        "expected_response_time_ms": test_case.get(
+            "expected_response_time_ms"
+        ),
+        "p95_threshold_ms": test_case.get("p95_threshold_ms"),
+        "credentials_ref": test_case.get("credentials_ref"),
+    }
+
+
+def workload_profile_from_test_case(
+    test_case: dict[str, Any],
+) -> WorkloadProfile:
+    """Return a typed profile, retaining missing fields for input requests."""
+    try:
+        return WorkloadProfile.model_validate(_catalog_profile_data(test_case))
+    except ValidationError as exc:
+        raise ValueError(f"Invalid workload profile: {exc}") from exc
+
+
+def missing_profile_inputs(profile: WorkloadProfile | None) -> list[str]:
+    if profile is None:
+        return list(_PROFILE_FIELD_NAMES) + ["payload_template"]
+
+    missing = [
+        field
+        for field in _PROFILE_FIELD_NAMES
+        if getattr(profile, field) is None
+        or (
+            isinstance(getattr(profile, field), str)
+            and not getattr(profile, field).strip()
+        )
+    ]
+    if profile.method in _BODY_METHODS and profile.payload_template is None:
+        missing.append("payload_template")
+    return missing
+
+
+def is_k6_test_request(request: str) -> bool:
+    """Identify requests to create or run k6 performance-test workloads."""
+    return bool(_K6_TASK_PATTERN.search(request))
+
+
+def is_simulated_tool_request(request: str) -> bool:
+    """Identify JMeter/Gatling workload requests that must stay simulated."""
+    return bool(_SIMULATED_TOOL_TASK_PATTERN.search(request))
+
+
+def extract_catalog_test_case_id(request: str) -> str | None:
+    """Return the single explicit catalog ID in a request, if present."""
+    test_case_ids = {
+        match.group(0).upper()
+        for match in _CATALOG_TEST_CASE_ID_PATTERN.finditer(request)
+    }
+    if len(test_case_ids) > 1:
+        raise ValueError(
+            "A request can select only one catalog test case at a time."
+        )
+    return next(iter(test_case_ids), None)
+
+
+def _configured_positive_int(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a positive integer.") from exc
+    if value < 1:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
+def _enabled_by_configuration() -> bool:
+    raw_value = os.getenv("REAL_EXECUTION_ENABLED", "false").strip().lower()
+    if raw_value not in {"true", "false", "1", "0", "yes", "no"}:
+        raise ValueError(
+            "REAL_EXECUTION_ENABLED must be one of true/false, 1/0, or yes/no."
+        )
+    return raw_value in {"true", "1", "yes"}
+
+
+def _allowed_hosts() -> set[str]:
+    configured = os.getenv(
+        "REAL_EXECUTION_ALLOWED_HOSTS",
+        "localhost,127.0.0.1",
+    )
+    return {
+        host.strip().lower().rstrip(".")
+        for host in configured.split(",")
+        if host.strip()
+    }
+
+
+def _allowed_ports() -> set[int]:
+    configured = os.getenv("REAL_EXECUTION_ALLOWED_PORTS", "8000")
+    ports: set[int] = set()
+    for raw_port in configured.split(","):
+        try:
+            port = int(raw_port.strip())
+        except ValueError as exc:
+            raise ValueError(
+                "REAL_EXECUTION_ALLOWED_PORTS must contain comma-separated ports."
+            ) from exc
+        if not 1 <= port <= 65535:
+            raise ValueError("Allowed ports must be between 1 and 65535.")
+        ports.add(port)
+    return ports
+
+
+def validate_target_url(target_url: str) -> list[str]:
+    """Validate the origin and every resolved address against the allowlist.
+
+    A real runner must call this again for every redirect target before
+    following it; Phase 1 performs the initial-target preflight only.
+    """
+    errors: list[str] = []
+    try:
+        parsed = urlsplit(target_url)
+        hostname = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return ["target_url is not a valid URL."]
+
+    if parsed.scheme != "http":
+        errors.append("target_url must use http for the approved local mock.")
+    if not hostname:
+        errors.append("target_url must include a hostname.")
+        return errors
+    if parsed.username or parsed.password:
+        errors.append("target_url must not include embedded credentials.")
+
+    normalized_host = hostname.lower().rstrip(".")
+    if normalized_host not in _allowed_hosts():
+        errors.append(
+            f"Target host '{hostname}' is not in REAL_EXECUTION_ALLOWED_HOSTS."
+        )
+
+    resolved_port = port if port is not None else (80 if parsed.scheme == "http" else 443)
+    if resolved_port not in _allowed_ports():
+        errors.append(
+            f"Target port {resolved_port} is not in REAL_EXECUTION_ALLOWED_PORTS."
+        )
+
+    if parsed.query or parsed.fragment:
+        errors.append("target_url must not contain a query or fragment.")
+    if parsed.path not in {"", "/"}:
+        errors.append(
+            "target_url must be an origin only; put the request path in endpoint."
+        )
+
+    if normalized_host in _allowed_hosts():
+        try:
+            resolved = socket.getaddrinfo(
+                normalized_host,
+                resolved_port,
+                type=socket.SOCK_STREAM,
+            )
+        except OSError as exc:
+            errors.append(
+                f"Could not resolve allowed target host '{hostname}': {exc}."
+            )
+        else:
+            addresses = {entry[4][0] for entry in resolved}
+            if not addresses:
+                errors.append(f"Target host '{hostname}' resolved to no addresses.")
+            elif any(
+                not ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
+                for address in addresses
+            ):
+                errors.append(
+                    f"Target host '{hostname}' resolves to a non-loopback address."
+                )
+    return errors
+
+
+def validate_real_profile(
+    profile: WorkloadProfile | None,
+) -> dict[str, Any]:
+    missing = missing_profile_inputs(profile)
+    if missing:
+        return {
+            "status": "needs_input",
+            "missing_inputs": missing,
+            "blocked_reasons": [],
+        }
+
+    assert profile is not None
+    errors: list[str] = []
+    if profile.endpoint is not None:
+        endpoint_path = unquote(profile.endpoint)
+        if (
+            not profile.endpoint.startswith("/")
+            or profile.endpoint.startswith("//")
+            or "://" in profile.endpoint
+            or profile.endpoint.startswith("//")
+            or "\\" in endpoint_path
+            or "?" in profile.endpoint
+            or "#" in profile.endpoint
+            or any(ord(character) < 32 or ord(character) == 127 for character in endpoint_path)
+            or endpoint_path.startswith("//")
+            or any(part == ".." for part in endpoint_path.split("/"))
+        ):
+            errors.append(
+                "endpoint must be a local absolute path, not a URL or traversal path."
+            )
+    try:
+        max_users = _configured_positive_int("REAL_EXECUTION_MAX_USERS", 500)
+        max_duration = _configured_positive_int(
+            "REAL_EXECUTION_MAX_DURATION_SECONDS",
+            500,
+        )
+        max_ramp_up = _configured_positive_int(
+            "REAL_EXECUTION_MAX_RAMP_UP_SECONDS",
+            90,
+        )
+        assert profile.users is not None
+        assert profile.duration_seconds is not None
+        assert profile.ramp_up_seconds is not None
+        if profile.users > max_users:
+            errors.append(f"users exceeds the configured maximum of {max_users}.")
+        if profile.duration_seconds > max_duration:
+            errors.append(
+                "duration_seconds exceeds the configured maximum of "
+                f"{max_duration}."
+            )
+        if profile.ramp_up_seconds > max_ramp_up:
+            errors.append(
+                f"ramp_up_seconds exceeds the configured maximum of {max_ramp_up}."
+            )
+        if profile.ramp_up_seconds > profile.duration_seconds:
+            errors.append("ramp_up_seconds cannot exceed duration_seconds.")
+        if profile.ramp_up_seconds * 2 > profile.duration_seconds:
+            errors.append(
+                "duration_seconds must accommodate both ramp-up and ramp-down."
+            )
+        errors.extend(validate_target_url(profile.target_url or ""))
+        real_execution_enabled = _enabled_by_configuration()
+    except ValueError as exc:
+        return {
+            "status": "blocked",
+            "missing_inputs": [],
+            "blocked_reasons": [str(exc)],
+        }
+
+    if errors:
+        return {
+            "status": "rejected",
+            "missing_inputs": [],
+            "blocked_reasons": errors,
+        }
+    if not real_execution_enabled:
+        return {
+            "status": "blocked",
+            "missing_inputs": [],
+            "blocked_reasons": [
+                "REAL_EXECUTION_ENABLED is false; real runs are disabled.",
+            ],
+        }
+    return {
+        "status": "ready",
+        "missing_inputs": [],
+        "blocked_reasons": [],
+    }
+
+
+def resolve_artifact_directory(job_id: str) -> Path:
+    if not _JOB_ID_PATTERN.fullmatch(job_id):
+        raise ValueError("job_id must use the generated JOB-<uuid> format.")
+    return (artifact_root_directory() / job_id).resolve()
+
+
+def artifact_root_directory() -> Path:
+    artifact_root = Path(
+        os.getenv(
+            "EXECUTION_ARTIFACTS_ROOT",
+            str(_DEFAULT_ARTIFACTS_ROOT),
+        )
+    ).expanduser()
+    if not artifact_root.is_absolute():
+        artifact_root = _PROJECT_ROOT / artifact_root
+    return artifact_root.resolve()
+
+
+def artifact_directory_reference(job_id: str) -> str:
+    """Return a stable project-relative artifact path when inside the repo."""
+    artifact_directory = resolve_artifact_directory(job_id)
+    try:
+        return artifact_directory.relative_to(_PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(artifact_directory)
+
+
+def create_execution_job_context(
+    *,
+    execution_mode: str = "SIMULATED",
+    workload_profile: dict[str, Any] | WorkloadProfile | None = None,
+    source_id: str | None = None,
+    test_case_id: str | None = None,
+    test_case_name: str | None = None,
+    job_id: str | None = None,
+) -> dict[str, Any]:
+    if not isinstance(execution_mode, str):
+        raise ValueError("execution_mode must be REAL or SIMULATED.")
+    mode = execution_mode.strip().upper()
+    if mode not in {"REAL", "SIMULATED"}:
+        raise ValueError("execution_mode must be REAL or SIMULATED.")
+
+    if isinstance(workload_profile, dict):
+        profile = workload_profile_from_test_case(
+            {"workload_profile": workload_profile}
+        )
+    else:
+        profile = workload_profile
+
+    if mode == "REAL":
+        preflight_data = validate_real_profile(profile)
+    else:
+        preflight_data = {
+            "status": "not_required",
+            "missing_inputs": [],
+            "blocked_reasons": [],
+        }
+    preflight = ExecutionPreflight.model_validate(preflight_data)
+
+    if job_id is None:
+        job_id = f"JOB-{uuid.uuid4().hex}"
+    artifact_directory = resolve_artifact_directory(job_id)
+
+    status: ExecutionStatus = "not_started"
+    if mode == "REAL" and preflight.status == "needs_input":
+        status = "needs_input"
+    elif mode == "REAL" and preflight.status in {"blocked", "rejected"}:
+        status = "blocked"
+
+    context = ExecutionJobContext(
+        job_id=job_id,
+        execution_mode="REAL" if mode == "REAL" else "SIMULATED",
+        workload_profile=profile,
+        execution_preflight=preflight,
+        execution_status=status,
+        execution_artifact_directory=str(artifact_directory),
+        execution_artifacts=ExecutionArtifactManifest(
+            job_id=job_id,
+            execution_mode="REAL" if mode == "REAL" else "SIMULATED",
+        ),
+        execution_source_id=source_id,
+        test_case_id=test_case_id,
+        test_case_name=test_case_name,
+    )
+    return context.model_dump(mode="json")
+
+
+def create_context_for_test_case(
+    test_case: dict[str, Any],
+    *,
+    source_id: str | None = None,
+) -> dict[str, Any]:
+    profile = workload_profile_from_test_case(test_case)
+    configured_mode = str(
+        test_case.get("execution_mode", "SIMULATED")
+    ).strip().upper()
+    if profile.tool == "k6":
+        mode = "REAL"
+    elif profile.tool in {"jmeter", "gatling"}:
+        mode = "SIMULATED"
+    else:
+        mode = configured_mode
+    return create_execution_job_context(
+        execution_mode=mode,
+        workload_profile=profile,
+        source_id=source_id,
+        test_case_id=(
+            str(test_case["test_case_id"])
+            if test_case.get("test_case_id") is not None
+            else None
+        ),
+        test_case_name=(
+            str(test_case["name"])
+            if test_case.get("name") is not None
+            else None
+        ),
+    )
+
+
+__all__ = [
+    "ExecutionArtifactManifest",
+    "ExecutionJobResult",
+    "ExecutionJobContext",
+    "ExecutionMode",
+    "ExecutionPreflight",
+    "ExecutionStatus",
+    "artifact_directory_reference",
+    "artifact_root_directory",
+    "ArtifactKey",
+    "WorkloadProfile",
+    "create_context_for_test_case",
+    "create_execution_job_context",
+    "extract_catalog_test_case_id",
+    "is_k6_test_request",
+    "is_simulated_tool_request",
+    "missing_profile_inputs",
+    "real_execution_gate",
+    "resolve_artifact_directory",
+    "validate_real_profile",
+    "validate_target_url",
+    "workload_profile_from_test_case",
+]

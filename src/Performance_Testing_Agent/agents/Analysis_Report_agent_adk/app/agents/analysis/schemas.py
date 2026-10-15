@@ -46,13 +46,15 @@ class MonitoringResult(BaseModel):
     job_id: str = "unknown"
     application: str = "unknown"
     scenario: str = "unknown"
-    cpu_usage: float
-    memory_usage: float
-    db_connections: float
-    response_time: float  # monitoring's own view of response time -- may
+    cpu_usage: Optional[float] = None
+    cpu_peak_usage: Optional[float] = None
+    memory_usage: Optional[float] = None
+    memory_peak_usage: Optional[float] = None
+    db_connections: Optional[float] = None
+    response_time: Optional[float] = None  # monitoring's own view of response time -- may
                            # differ slightly from test_execution's avg_response_time;
                            # we cross-check the two rather than assume they match.
-    tps: float
+    tps: Optional[float] = None
     status: str  # e.g. "OK"
     alerts: List[Any] = Field(default_factory=list)  # item shape not specified -- treated as opaque
 
@@ -107,14 +109,18 @@ class InfraHealthFinding(BaseModel):
     """Derived from monitoring_agent's single job-level snapshot."""
     status: str  # pass | warning | fail (derived here, independent of monitoring's own "status" field)
     monitoring_reported_status: str  # monitoring_agent's own "status" field, passed through as-is
-    cpu_usage: float
-    memory_usage: float
-    db_connections: float
-    tps: float
-    monitoring_response_time: float
+    cpu_usage: Optional[float] = None
+    cpu_peak_usage: Optional[float] = None
+    memory_usage: Optional[float] = None
+    memory_peak_usage: Optional[float] = None
+    db_connections: Optional[float] = None
+    tps: Optional[float] = None
+    monitoring_response_time: Optional[float] = None
     alerts: List[Any] = Field(default_factory=list)
     anomalies: List[str] = Field(default_factory=list)
     cross_check_note: Optional[str] = None  # e.g. mismatch between monitoring's response_time and test_execution's avg
+    data_source: Optional[str] = None
+    measurement_provenance: dict[str, Any] = Field(default_factory=dict)
 
 
 class SecuritySummary(BaseModel):
@@ -140,6 +146,11 @@ class AnalysisOutput(BaseModel):
     api_findings: List[ApiFinding] = Field(default_factory=list)
     infra_health: Optional[InfraHealthFinding] = None
     security_summary: Optional[SecuritySummary] = None
+    time_series_analysis: Optional[dict[str, Any]] = None
+    execution_mode: Optional[str] = None
+    execution_profile: Optional[dict[str, Any]] = None
+    execution_artifact_directory: Optional[str] = None
+    execution_artifacts: dict[str, str] = Field(default_factory=dict)
 
     summary: Optional[str] = None
     ready_for_report: bool = False

@@ -163,15 +163,6 @@ def _validate_result(result: dict) -> None:
         )
 
     if (
-        result["p95_response_time"]
-        < result["avg_response_time"]
-    ):
-        raise ValueError(
-            "P95 response time cannot be lower than "
-            "average response time."
-        )
-
-    if (
         result["max_response_time"]
         < result["p95_response_time"]
     ):

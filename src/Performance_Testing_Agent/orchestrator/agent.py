@@ -3,6 +3,7 @@ from pathlib import Path
 
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.tools import AgentTool
 
 from ..config import LITELLM_MODEL_NAME, TEMPERATURE
 
@@ -32,7 +33,11 @@ from ..agents.Analysis_Report_agent_adk.app.agents.analysis.agent import analysi
 from ..agents.Analysis_Report_agent_adk.app.agents.report.agent import report_agent
 
 from .prompts import ORCHESTRATOR_SYSTEM_PROMPT
-from .tools import record_test_case_prompt
+from .tools import (
+    bind_explicit_catalog_case,
+    load_catalog_test_case,
+    record_test_case_prompt,
+)
 
 
 
@@ -40,21 +45,9 @@ def build_orchestrator_agent() -> LlmAgent:
     """
     Builds the top-level ADK agent.
 
-    Each domain capability (test execution, monitoring, security, analysis,
-    report) is its own real LlmAgent, defined in agents/*.py, wired in here
-    as a genuine ADK sub_agent - not a plain function tool. Each teammate
-    can own one of those files and swap the mock function for a real
-    integration (real k6/JMeter run, real Prometheus query, real Jira/
-    Confluence call, etc.) without touching this orchestrator.
-
-    Every sub-agent sets mode="single_turn" (see agents/*.py). That makes
-    ADK wrap it as a call-and-return node rather than a full chat "transfer"
-    - i.e. the orchestrator calls it, gets a result back, and stays in
-    control, which is what lets it run several sub-agents in sequence and
-    then produce one final report. Without mode="single_turn", an ADK
-    sub-agent would be a one-way handoff target the LLM can "transfer_to",
-    permanently giving up control of the conversation - not what we want
-    for a sequencing orchestrator.
+    Each specialist is wrapped as an AgentTool, allowing the orchestrator
+    to call specialists in sequence and retain control. AgentTool forwards
+    shared-state updates between its nested runner and this session.
 
     Results are shared between sub-agents via session state (see
     tool_context.state inside each agent's tool function in agents/*.py)
@@ -70,19 +63,19 @@ def build_orchestrator_agent() -> LlmAgent:
             temperature=TEMPERATURE,
         ),
         instruction=ORCHESTRATOR_SYSTEM_PROMPT,
+        before_agent_callback=bind_explicit_catalog_case,
         description=(
             "Orchestrates the test-execution, monitoring, security, "
             "analysis and reporting sub-agents for a banking application."
         ),
         tools=[
             record_test_case_prompt,
-        ],
-        sub_agents=[
-            test_execution_agent,
-            monitoring_agent,
-            security_agent,
-            analysis_agent,
-            report_agent,
+            load_catalog_test_case,
+            AgentTool(agent=test_execution_agent, skip_summarization=True),
+            AgentTool(agent=monitoring_agent, skip_summarization=True),
+            AgentTool(agent=security_agent, skip_summarization=True),
+            AgentTool(agent=analysis_agent, skip_summarization=True),
+            AgentTool(agent=report_agent, skip_summarization=True),
         ],
     )
 

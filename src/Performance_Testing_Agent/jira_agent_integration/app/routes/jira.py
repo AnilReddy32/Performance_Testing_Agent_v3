@@ -9,6 +9,9 @@ from Performance_Testing_Agent.jira_agent_integration.jira_service import proces
 from Performance_Testing_Agent.jira_agent_integration.test_case_resolver import (
     resolve_issue_test_case,
 )
+from Performance_Testing_Agent.execution_context import (
+    create_context_for_test_case,
+)
 
 import json
 
@@ -102,6 +105,14 @@ async def execute_jira_issue(issue_key: str):
             "test_case_id": test_definition["test_case_id"],
             "test_case": test_definition,
         }
+        execution_context = create_context_for_test_case(
+            test_definition,
+            source_id=issue_key,
+        )
+        task_context["execution_mode"] = execution_context["execution_mode"]
+        task_context["execution_preflight"] = execution_context[
+            "execution_preflight"
+        ]
 
         agent_prompt = (
             "You have received a performance-testing task from Jira.\n"
@@ -115,7 +126,10 @@ async def execute_jira_issue(issue_key: str):
             + json.dumps(task_context, indent=2, ensure_ascii=False)
         )
 
-        agent_response = await run_orchestrator(agent_prompt)
+        agent_response = await run_orchestrator(
+            agent_prompt,
+            initial_state=execution_context,
+        )
 
         return{
             "success": True,
