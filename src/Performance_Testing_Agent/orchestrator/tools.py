@@ -16,6 +16,7 @@ from google.adk.tools import ToolContext
 from Performance_Testing_Agent.execution_context import (
     create_context_for_test_case,
     extract_catalog_test_case_id,
+    requested_execution_tool,
 )
 from Performance_Testing_Agent.test_case_catalog.catalog import get_test_case
 
@@ -46,9 +47,18 @@ def bind_explicit_catalog_case(
     if test_case_id is None:
         return
     state = callback_context.state
-    if state.get("test_case_id") == test_case_id:
+    requested_tool = requested_execution_tool(request_text)
+    existing_tool = (state.get("workload_profile") or {}).get("tool")
+    if state.get("test_case_id") == test_case_id and (
+        requested_tool is None or requested_tool == existing_tool
+    ):
         return
-    _bind_catalog_test_case(test_case_id, state, "ADK_WEB")
+    _bind_catalog_test_case(
+        test_case_id,
+        state,
+        "ADK_WEB",
+        requested_tool=requested_tool,
+    )
 
 
 def load_catalog_test_case(
@@ -71,11 +81,16 @@ def _bind_catalog_test_case(
     normalized_id: str,
     state: Any,
     source_id: str,
+    *,
+    requested_tool: str | None = None,
 ) -> dict:
     case = get_test_case(normalized_id)
     existing_id = state.get("test_case_id")
     execution_status = state.get("execution_status")
-    if existing_id == normalized_id:
+    existing_tool = (state.get("workload_profile") or {}).get("tool")
+    if existing_id == normalized_id and (
+        requested_tool is None or requested_tool == existing_tool
+    ):
         return {
             "status": "already_loaded",
             "test_case_id": normalized_id,
@@ -110,7 +125,11 @@ def _bind_catalog_test_case(
             "start a new session before selecting another catalog case."
         )
 
-    context = create_context_for_test_case(case, source_id=source_id)
+    context = create_context_for_test_case(
+        case,
+        source_id=source_id,
+        requested_tool=requested_tool,
+    )
     state.update(context)
     state.update(
         {

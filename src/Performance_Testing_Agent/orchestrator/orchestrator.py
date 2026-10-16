@@ -11,8 +11,11 @@ from Performance_Testing_Agent.execution_context import (
     create_execution_job_context,
     create_context_for_test_case,
     extract_catalog_test_case_id,
+    is_explicit_execution_request,
+    is_jmeter_test_request,
     is_k6_test_request,
     is_simulated_tool_request,
+    requested_execution_tool,
     resolve_artifact_directory,
 )
 from Performance_Testing_Agent.test_case_catalog.catalog import get_test_case
@@ -119,6 +122,15 @@ class Orchestrator:
             state.clear()
             state.update(refreshed)
 
+        async def persist_state(values: dict) -> None:
+            session = await self.session_service.get_session(
+                app_name=ADK_APP_NAME,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            if session is not None:
+                session.state.update(values)
+
         pipeline = await complete_real_k6_pipeline(
             state=state,
             user_query=user_query,
@@ -128,6 +140,7 @@ class Orchestrator:
             analysis_agent=analysis_agent,
             report_agent=report_agent,
             agents_called=agents_called,
+            persist_state=persist_state,
         )
         return (state, pipeline) if pipeline is not None else None
 
@@ -152,8 +165,17 @@ class Orchestrator:
             job_context = create_context_for_test_case(
                 catalog_case,
                 source_id=context.get("execution_source_id") or "API_CHAT",
+                requested_tool=requested_execution_tool(user_query),
             )
         elif is_k6_test_request(user_query):
+            execution_mode = "REAL"
+        elif is_jmeter_test_request(user_query):
+            execution_mode = "REAL"
+        elif (
+            isinstance(context.get("workload_profile"), dict)
+            and context["workload_profile"].get("tool") == "jmeter"
+            and is_explicit_execution_request(user_query)
+        ):
             execution_mode = "REAL"
         else:
             execution_mode = (
@@ -214,22 +236,26 @@ class Orchestrator:
         )
         if pipeline_result is not None:
             state, pipeline_status = pipeline_result
+            execution_tool = (state.get("workload_profile") or {}).get("tool")
+            pipeline_label = (
+                "REAL k6 pipeline" if execution_tool == "k6" else "REAL JMeter pipeline"
+            )
             report_payload = json_object(state.get("report_result"))
             if report_payload is not None:
                 state["report_result"] = report_payload
                 if report_payload.get("file_path"):
                     final_text = (
-                        "REAL k6 pipeline completed. Final report: "
+                        f"{pipeline_label} completed. Final report: "
                         f"{report_payload['file_path']}"
                     )
                 else:
                     final_text = (
-                        "REAL k6 pipeline completed, but the report agent "
+                        f"{pipeline_label} completed, but the report agent "
                         "did not return a report file path."
                     )
             elif "report" in pipeline_status:
                 final_text = (
-                    "REAL k6 pipeline did not complete report generation. "
+                    f"{pipeline_label} did not complete report generation. "
                     f"Stage status: {pipeline_status['report']}"
                 )
 
@@ -251,21 +277,33 @@ class Orchestrator:
         registered_artifacts: dict[str, str] = {}
         job_id = state.get("job_id")
         execution_mode = state.get("execution_mode", "SIMULATED")
+        workload_profile = state.get("workload_profile")
+        execution_tool = (
+            workload_profile.get("tool")
+            if isinstance(workload_profile, dict)
+            else None
+        )
         if isinstance(job_id, str) and isinstance(artifacts, dict):
-            job_directory = resolve_artifact_directory(job_id)
+            job_directory = resolve_artifact_directory(job_id, tool=execution_tool)
             for key, filename in {**artifacts, **(
                 report_artifacts if isinstance(report_artifacts, dict) else {}
             )}.items():
                 if (
                     not isinstance(key, str)
                     or not isinstance(filename, str)
-                    or Path(filename).name != filename
+                    or Path(filename).as_posix() != filename
+                    or Path(filename).is_absolute()
+                    or any(part in {"", ".", ".."} for part in Path(filename).parts)
                 ):
                     continue
                 artifact_path = (job_directory / filename).resolve()
                 if (
-                    artifact_path.parent == job_directory
+                    artifact_path.is_relative_to(job_directory)
                     and artifact_path.is_file()
+                    and not any(
+                        job_directory.joinpath(*Path(filename).parts[:index]).is_symlink()
+                        for index in range(1, len(Path(filename).parts) + 1)
+                    )
                 ):
                     registered_artifacts[key] = filename
             if registered_artifacts:
@@ -273,6 +311,7 @@ class Orchestrator:
                     job_id,
                     execution_mode,
                     registered_artifacts,
+                    tool=execution_tool,
                 )
                 public_base_url = os.getenv(
                     "ARTIFACT_PUBLIC_BASE_URL",
@@ -301,9 +340,10 @@ class Orchestrator:
                 "job_id": job_id,
                 "execution_mode": execution_mode,
                 "status": state.get("execution_status", "not_started"),
-                "pipeline_stages": state.get("real_k6_pipeline"),
+                "pipeline_stages": state.get("real_jmeter_pipeline")
+                or state.get("real_k6_pipeline"),
                 "artifact_directory": (
-                    artifact_directory_reference(job_id)
+                    artifact_directory_reference(job_id, tool=execution_tool)
                     if job_id
                     else None
                 ),
@@ -320,7 +360,10 @@ class Orchestrator:
         public_state = dict(state)
         if public_state.get("job_id"):
             public_state["execution_artifact_directory"] = (
-                artifact_directory_reference(public_state["job_id"])
+                artifact_directory_reference(
+                    public_state["job_id"],
+                    tool=execution_tool,
+                )
             )
 
         return {
@@ -330,9 +373,10 @@ class Orchestrator:
                 "job_id": job_id,
                 "execution_mode": execution_mode,
                 "status": state.get("execution_status", "not_started"),
-                "pipeline_stages": state.get("real_k6_pipeline"),
+                "pipeline_stages": state.get("real_jmeter_pipeline")
+                or state.get("real_k6_pipeline"),
                 "artifact_directory": (
-                    artifact_directory_reference(job_id)
+                    artifact_directory_reference(job_id, tool=execution_tool)
                     if job_id
                     else None
                 ),

@@ -36,16 +36,13 @@ class TestOrchestratorExecutionRouting(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["execution_job"]["execution_mode"], "REAL")
         self.assertEqual(result["execution_job"]["status"], "needs_input")
 
-    async def test_jmeter_and_gatling_requests_stay_simulated(self):
-        for tool in ("JMeter", "Gatling"):
-            with self.subTest(tool=tool):
-                result, _ = await self._execute(
-                    f"Generate a {tool} test script"
-                )
-                self.assertEqual(
-                    result["execution_job"]["execution_mode"],
-                    "SIMULATED",
-                )
+    async def test_jmeter_uses_real_preflight_while_gatling_stays_simulated(self):
+        jmeter_result, _ = await self._execute("Generate a JMeter test script")
+        self.assertEqual(jmeter_result["execution_job"]["execution_mode"], "REAL")
+        self.assertEqual(jmeter_result["execution_job"]["status"], "needs_input")
+
+        gatling_result, _ = await self._execute("Generate a Gatling test script")
+        self.assertEqual(gatling_result["execution_job"]["execution_mode"], "SIMULATED")
 
     async def test_explicit_catalog_id_binds_complete_real_profile(self):
         with (
@@ -74,6 +71,40 @@ class TestOrchestratorExecutionRouting(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state["workload_profile"]["max_rps"], 5)
         self.assertEqual(state["workload_profile"]["duration_seconds"], 50)
         self.assertEqual(result["execution_job"]["execution_mode"], "REAL")
+
+    async def test_same_catalog_case_can_select_jmeter_or_k6_explicitly(self):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "REAL_EXECUTION_ENABLED": "true",
+                    "REAL_EXECUTION_ALLOWED_HOSTS": "localhost,127.0.0.1",
+                    "REAL_EXECUTION_ALLOWED_PORTS": "8000",
+                },
+                clear=True,
+            ),
+            patch(
+                "Performance_Testing_Agent.execution_context.socket.getaddrinfo",
+                return_value=[(None, None, None, None, ("127.0.0.1", 8000))],
+            ),
+        ):
+            jmeter_result, jmeter_state = await self._execute(
+                "Run test case PTC-012 using JMeter and generate the report"
+            )
+            k6_result, k6_state = await self._execute(
+                "Run test case PTC-012 using k6 and generate the report"
+            )
+
+        self.assertEqual(jmeter_state["test_case_id"], "PTC-012")
+        self.assertEqual(jmeter_state["workload_profile"]["tool"], "jmeter")
+        self.assertEqual(jmeter_state["execution_preflight"]["status"], "ready")
+        self.assertEqual(jmeter_state["workload_profile"]["target_url"], "http://localhost:8000")
+        self.assertEqual(jmeter_result["execution_job"]["execution_mode"], "REAL")
+
+        self.assertEqual(k6_state["test_case_id"], "PTC-012")
+        self.assertEqual(k6_state["workload_profile"]["tool"], "k6")
+        self.assertEqual(k6_state["execution_preflight"]["status"], "ready")
+        self.assertEqual(k6_result["execution_job"]["execution_mode"], "REAL")
 
     async def test_unknown_catalog_id_fails_before_agent_run(self):
         orchestrator = Orchestrator.__new__(Orchestrator)

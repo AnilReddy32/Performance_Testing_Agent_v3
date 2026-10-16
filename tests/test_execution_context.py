@@ -8,9 +8,11 @@ from Performance_Testing_Agent.execution_context import (
     create_context_for_test_case,
     create_execution_job_context,
     is_k6_test_request,
+    is_jmeter_test_request,
     is_simulated_tool_request,
     missing_profile_inputs,
     real_execution_gate,
+    requested_execution_tool,
     validate_real_profile,
     validate_target_url,
     workload_profile_from_test_case,
@@ -24,13 +26,26 @@ class TestWorkloadProfile(unittest.TestCase):
             is_k6_test_request("Generate a k6 script for the payment API")
         )
         self.assertTrue(is_k6_test_request("Run the k6 workload"))
-        self.assertTrue(
-            is_simulated_tool_request("Generate a JMeter test plan")
-        )
+        self.assertTrue(is_jmeter_test_request("Generate a JMeter test plan"))
+        self.assertFalse(is_simulated_tool_request("Generate a JMeter test plan"))
         self.assertTrue(is_simulated_tool_request("Run the Gatling workload"))
         self.assertFalse(is_k6_test_request("Generate a JMeter test plan"))
         self.assertFalse(is_k6_test_request("Generate a Gatling simulation"))
         self.assertFalse(is_simulated_tool_request("Generate a k6 script"))
+        self.assertEqual(
+            requested_execution_tool(
+                "Run test case PTC-001 using JMeter; this case normally uses k6"
+            ),
+            "jmeter",
+        )
+        self.assertEqual(
+            requested_execution_tool("Run test case PTC-001 using k6"),
+            "k6",
+        )
+        with self.assertRaisesRegex(ValueError, "either k6 or JMeter"):
+            requested_execution_tool(
+                "Run the k6 test and the JMeter test for PTC-001"
+            )
 
     def test_adapts_existing_catalog_fields_without_guessing_missing_values(self):
         profile = workload_profile_from_test_case(
@@ -81,12 +96,12 @@ class TestWorkloadProfile(unittest.TestCase):
 
         self.assertTrue(
             context["execution_artifact_directory"].endswith(
-                f"/src/generated_scripts/artifacts/{context['job_id']}"
+                f"/src/generated_scripts/k6 native reports/{context['job_id']}"
             )
         )
         self.assertTrue(
             artifact_directory_reference(context["job_id"]).startswith(
-                "src/generated_scripts/artifacts/"
+                "src/generated_scripts/k6 native reports/"
             )
         )
 
@@ -105,14 +120,10 @@ class TestWorkloadProfile(unittest.TestCase):
     def test_catalog_exposes_normalized_profile_and_explicit_mode(self):
         case = get_test_case("PTC-001")
 
-        self.assertEqual(case["execution_mode"], "SIMULATED")
-        self.assertEqual(case["workload_profile"]["endpoint"], "/api/payment")
-        self.assertEqual(case["workload_profile"]["users"], 200)
-        self.assertEqual(
-            case["workload_profile"]["expected_response_time_ms"],
-            2000,
-        )
-        self.assertIsNone(case["workload_profile"]["target_url"])
+        self.assertEqual(case["execution_mode"], "REAL")
+        self.assertEqual(case["workload_profile"]["endpoint"], "/api/users/23")
+        self.assertEqual(case["workload_profile"]["users"], 1)
+        self.assertEqual(case["workload_profile"]["target_url"], "https://reqres.in")
 
     def test_real_report_case_has_complete_capped_profile(self):
         case = get_test_case("PTC-012")

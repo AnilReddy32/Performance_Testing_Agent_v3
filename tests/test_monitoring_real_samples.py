@@ -296,7 +296,7 @@ class TestMonitoringRealSamples(unittest.TestCase):
                 "duration_seconds": 30,
             },
             execution_artifact_directory=(
-                f"src/generated_scripts/artifacts/{self.job_id}"
+                f"src/generated_scripts/k6 native reports/{self.job_id}"
             ),
             execution_artifacts={
                 "native_report": native_report.name,
@@ -392,7 +392,7 @@ class TestMonitoringRealSamples(unittest.TestCase):
         )
 
     def test_report_packaging_rejects_artifact_path_traversal(self):
-        with self.assertRaisesRegex(ValueError, "job-local filename"):
+        with self.assertRaisesRegex(ValueError, "safe job-local path"):
             report_tools.build_report_sections(
                 job_id=self.job_id,
                 application="Payments",

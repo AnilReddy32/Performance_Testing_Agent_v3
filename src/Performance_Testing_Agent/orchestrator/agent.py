@@ -54,7 +54,7 @@ _PIPELINE_REQUEST = re.compile(
 async def _complete_real_k6_pipeline_for_adk_web(
     callback_context: Context,
 ) -> genai_types.Content | None:
-    """Complete missing REAL k6 stages when ADK Web runs root_agent directly.
+    """Complete missing REAL k6/JMeter stages when ADK Web runs root_agent directly.
 
     FastAPI uses the same completion function from Orchestrator.execute. This
     callback covers ADK Web's direct root_agent entry point and skips
@@ -97,14 +97,17 @@ async def _complete_real_k6_pipeline_for_adk_web(
 
     report_result = json_object(callback_context.state.get("report_result"))
     report_path = report_result.get("file_path") if report_result else None
+    profile = callback_context.state.get("workload_profile")
+    tool = profile.get("tool") if isinstance(profile, dict) else "k6"
+    pipeline_label = "REAL JMeter pipeline" if tool == "jmeter" else "REAL k6 pipeline"
     if isinstance(report_path, str) and report_path:
-        message = f"REAL k6 pipeline completed. Final report: {report_path}"
+        message = f"{pipeline_label} completed. Final report: {report_path}"
     else:
         stage_summary = ", ".join(
             f"{stage}={status}" for stage, status in pipeline.items()
         )
         message = (
-            "REAL k6 pipeline finished with an incomplete report stage. "
+            f"{pipeline_label} finished with an incomplete report stage. "
             f"Stage status: {stage_summary}"
         )
     return genai_types.Content(

@@ -177,11 +177,13 @@ replace an unstarted, blocked, completed, or failed job with the explicitly
 selected case, but not an active or unrecognized job. If the selected ID is
 unknown or the tool reports a conflict, explain the error and do not execute.
 
-When an execution request names a catalog case, use that case's complete
-workload profile and execution mode. Do not ask the user to repeat profile
-fields that are already present in the catalog. If that case's preflight is
-blocked, report the configured blocker; if it needs input, report only the
-fields actually absent from the catalog.
+When an execution request names a catalog case, use its trusted workload
+fields. If the user explicitly names k6 or JMeter, the catalog binder selects
+that runner for this job while retaining the case's target and workload
+settings and rerunning REAL preflight for the selected runner. Do not ask the
+user to repeat profile fields already present in the catalog. If preflight is
+blocked, report its configured blocker; if it needs input, report only fields
+actually absent from the catalog.
 
 ----------------------------------------------------
 STEP 1 - PLAN BEFORE YOU CALL ANYTHING
@@ -277,10 +279,10 @@ EXECUTION INPUTS AND EXECUTION MODE
 
 Treat `workload_profile` and `execution_preflight` in session state as
 trusted; never infer their values from request text, Jira descriptions, or
-attachments. A request to create or run a k6 performance-test script selects
-REAL execution, including API chat requests without a catalog case. For
-other requests, use the code-provided execution mode (API chat defaults to
-SIMULATED; Jira test-case mode comes from trusted catalog metadata).
+attachments. A request to create or run a k6 or JMeter performance-test
+script selects REAL execution, including API chat requests without a catalog
+case. For other requests, use the code-provided execution mode (API chat
+defaults to SIMULATED; Jira test-case mode comes from trusted catalog metadata).
 Mentioning a case ID alone is not authorization to run it; the user must
 explicitly request execution.
 
@@ -288,24 +290,41 @@ For REAL mode, if preflight lists missing inputs, ask for those values and
 do not run a test. If preflight is blocked or rejected, explain the reason.
 Never fall back to simulated execution for a REAL request.
 
-If execution_mode is SIMULATED and the request is not a k6 performance-test
-script request, immediately delegate to the relevant sub-agents using
-supported simulation capabilities and defaults. Do not pause to ask whether
-this is a demo. State any defaults or assumptions used, and do not present
+If execution_mode is SIMULATED and the request is not a k6 or JMeter
+performance-test script request, immediately delegate to the relevant
+sub-agents using supported simulation capabilities and defaults. Do not pause
+to ask whether this is a demo. State any defaults or assumptions used, and do not present
 them as an approved real workload.
 
-JMeter and Gatling performance-test requests always use the existing
-simulated path. Do not select a real runner for those tools.
+JMeter performance-test requests use REAL mode and trusted-profile safety
+preflight. After preflight passes, generate a deterministic JMX plan from the
+trusted workload profile and save it in the current job artifact directory.
+A generation-only request must stop after the plan is prepared. Start a
+JMeter execution only when the user explicitly asks to run, execute, perform,
+start, or launch the test. If preflight blocks or needs input, report its
+exact result. For an explicit run request, execute the reviewed JMX with the
+real JMeter runner, return its JTL-derived metrics, exit status, and logs, and
+never invoke simulated execution as a fallback. Include JTL request counts,
+error rate, available latency percentiles, throughput, and current-job
+time-series artifacts in monitoring and analysis. Response/status or p95
+threshold breaches are completed REAL outcomes with thresholds_passed=false;
+dependency errors, timeouts, or runner failures are failed REAL outcomes.
+Gatling requests continue to use the existing simulated path.
 
 REAL k6 requests with passing preflight use a deterministic reviewed
 script and the real k6 runner. A request to create or run a k6 test script
 executes it for real by default, even when phrased as script generation;
 only an explicit instruction not to execute it stops after preparation.
-Real runs capture raw samples, normalized metrics, and k6's native HTML
-report. JMeter and Gatling use the existing simulated path. Never start the
-simulated MCP path for a REAL k6 request.
+Real k6 runs capture raw samples, normalized metrics, and k6's native HTML
+report. JMeter runs capture raw JTL results, normalized metrics, shared
+job-scoped time series, psutil load-generator host samples, runner logs, and
+JMeter's native HTML dashboard plus a downloadable dashboard/JTL ZIP. Keep
+load-generator CPU and memory explicitly distinct from target-resource data.
+Never start simulated execution for a REAL JMeter request. Gatling remains on
+the existing simulated path. Never start the simulated MCP path for a REAL k6
+request.
 
-After a completed REAL k6 run, call monitoring_agent and any other
+After a completed REAL k6 or JMeter run, call monitoring_agent and any other
 explicitly requested operational agents, then analysis_agent with all
 available execution, monitoring, and security results, and finally
 report_agent to produce the consolidated PDF. If execution needs input, is
@@ -525,8 +544,8 @@ REPORT AND ARTIFACT RESPONSE REQUIREMENTS:
   native_report_archive, state that the native report is already available
   and provide its existing path/reference. Do not ask whether the user wants
   it or suggest they request it separately.
-- Keep the consolidated PDF distinct from the native k6 HTML report and its
-  ZIP archive; they are separate artifacts.
+- Keep the consolidated PDF distinct from the native k6/JMeter dashboard and
+  its ZIP archive; they are separate artifacts.
 """
 
 

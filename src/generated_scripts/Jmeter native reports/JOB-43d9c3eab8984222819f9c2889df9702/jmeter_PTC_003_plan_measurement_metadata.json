@@ -1,0 +1,42 @@
+{
+  "job_id": "JOB-43d9c3eab8984222819f9c2889df9702",
+  "jmeter_run_window": {
+    "started_at": "2026-10-16T12:12:48.698337+00:00",
+    "finished_at": "2026-10-16T12:13:51.008456+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "alignment_origin": "jmeter_run_window.started_at",
+    "alignment_rule": "UTC timestamps converted to elapsed offsets from JMeter start, then floored into half-open five-second windows."
+  },
+  "sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 62,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-16T12:12:48.698192+00:00",
+      "sampler_stopped_at": "2026-10-16T12:13:51.008463+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "sampling_error": null
+    },
+    "jmeter_time_series": {
+      "data_source": "JMeter raw JTL sample rows",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  }
+}

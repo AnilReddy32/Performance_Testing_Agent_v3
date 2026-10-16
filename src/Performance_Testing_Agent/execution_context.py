@@ -19,6 +19,7 @@ ArtifactKey = Literal[
     "environment",
     "raw_results",
     "k6_summary",
+    "jmeter_log",
     "normalized_metrics",
     "time_series",
     "aligned_time_series",
@@ -26,6 +27,7 @@ ArtifactKey = Literal[
     "measurement_metadata",
     "native_report",
     "native_report_archive",
+    "native_report_entrypoint",
     "runner_log",
     "consolidated_report",
 ]
@@ -67,18 +69,29 @@ _K6_TASK_PATTERN = re.compile(
     r"load|run|execute|generate|create|prepare)\b.*\bk6\b",
     re.IGNORECASE | re.DOTALL,
 )
+_JMETER_TASK_PATTERN = re.compile(
+    r"\bjmeter\b.{0,160}\b(?:run|execute|perform|start|launch|generate|"
+    r"create|prepare|write|test|testing)\b|\b(?:run|execute|perform|"
+    r"start|launch|generate|create|prepare|write|test|testing)\b"
+    r".{0,160}\bjmeter\b",
+    re.IGNORECASE | re.DOTALL,
+)
 _SIMULATED_TOOL_TASK_PATTERN = re.compile(
-    r"\b(?:jmeter|gatling)\b.*\b(?:test|testing|script|scenario|workload|"
-    r"load|run|execute|generate|create|prepare)\b|\b(?:test|testing|script|"
+    r"\bgatling\b.*\b(?:test|testing|script|scenario|workload|load|run|"
+    r"execute|generate|create|prepare)\b|\b(?:test|testing|script|"
     r"scenario|workload|load|run|execute|generate|create|prepare)\b.*"
-    r"\b(?:jmeter|gatling)\b",
+    r"\bgatling\b",
     re.IGNORECASE | re.DOTALL,
 )
 _CATALOG_TEST_CASE_ID_PATTERN = re.compile(r"\b(?:PTC|WTC)-\d{3}\b", re.I)
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
-_DEFAULT_ARTIFACTS_ROOT = (
-    _PROJECT_ROOT / "src" / "generated_scripts" / "artifacts"
+_DEFAULT_K6_ARTIFACTS_ROOT = (
+    _PROJECT_ROOT / "src" / "generated_scripts" / "k6 native reports"
 )
+_DEFAULT_JMETER_ARTIFACTS_ROOT = (
+    _PROJECT_ROOT / "src" / "generated_scripts" / "Jmeter native reports"
+)
+_DEFAULT_ARTIFACTS_ROOT = _DEFAULT_K6_ARTIFACTS_ROOT
 _JOB_ID_PATTERN = re.compile(r"JOB-[0-9a-f]{32}")
 
 
@@ -285,8 +298,74 @@ def is_k6_test_request(request: str) -> bool:
     return bool(_K6_TASK_PATTERN.search(request))
 
 
+def is_jmeter_test_request(request: str) -> bool:
+    """Identify JMeter workload tasks that require REAL-mode preflight."""
+    return bool(_JMETER_TASK_PATTERN.search(request))
+
+
+def requested_execution_tool(request: str) -> str | None:
+    """Return an explicitly requested real runner, if the request names one."""
+    k6_selected = bool(
+        re.search(
+            r"\bk6\s+(?:test|script|plan|runner)\b|"
+            r"\b(?:using|with|via|through|use)\s+(?:the\s+)?k6\b",
+            request,
+            re.IGNORECASE,
+        )
+    )
+    jmeter_selected = bool(
+        re.search(
+            r"\bjmeter\s+(?:test|script|plan|runner)\b|"
+            r"\b(?:using|with|via|through|use)\s+(?:the\s+)?jmeter\b",
+            request,
+            re.IGNORECASE,
+        )
+    )
+    requested = {
+        tool
+        for tool, matches in (
+            ("k6", k6_selected),
+            ("jmeter", jmeter_selected),
+        )
+        if matches
+    }
+    if len(requested) > 1:
+        raise ValueError(
+            "Select either k6 or JMeter for one test case execution."
+        )
+    return next(iter(requested), None)
+
+
+def is_explicit_execution_request(request: str) -> bool:
+    """Return true only for an affirmative request to start a test run."""
+    if re.search(
+        r"\b(?:do not|don't|never|without|avoid|no need to|not)\b"
+        r"[^.!?,;\n]{0,80}\b(?:run|execute|perform|start|launch)\b",
+        request,
+        re.IGNORECASE,
+    ):
+        return False
+    pattern = re.compile(
+        r"\b(?:please\s+)?(?:run|execute|perform|start|launch)\b"
+        r"[^.!?,;\n]{0,80}\b(?:test|script|scenario|workload|it|this|"
+        r"jmeter|k6|gatling|"
+        r"against|now|PTC-\d{3}|WTC-\d{3})\b",
+        re.IGNORECASE,
+    )
+    for match in pattern.finditer(request):
+        prefix = request[: match.start()]
+        if re.search(
+            r"\b(?:can|could|would|will|might|should)\s*$",
+            prefix,
+            re.IGNORECASE,
+        ):
+            continue
+        return True
+    return False
+
+
 def is_simulated_tool_request(request: str) -> bool:
-    """Identify JMeter/Gatling workload requests that must stay simulated."""
+    """Identify Gatling workload requests that remain on the simulated path."""
     return bool(_SIMULATED_TOOL_TASK_PATTERN.search(request))
 
 
@@ -529,10 +608,21 @@ def validate_real_profile(
             90,
         )
         assert profile.users is not None
+        assert profile.max_rps is not None
         assert profile.duration_seconds is not None
         assert profile.ramp_up_seconds is not None
         if profile.users > max_users:
             errors.append(f"users exceeds the configured maximum of {max_users}.")
+        if profile.tool == "jmeter":
+            max_jmeter_rps = _configured_positive_int(
+                "REAL_JMETER_MAX_RPS",
+                1000,
+            )
+            if profile.max_rps > max_jmeter_rps:
+                errors.append(
+                    "max_rps exceeds the configured JMeter maximum of "
+                    f"{max_jmeter_rps}."
+                )
         if profile.duration_seconds > max_duration:
             errors.append(
                 "duration_seconds exceeds the configured maximum of "
@@ -583,27 +673,100 @@ def validate_real_profile(
     }
 
 
-def resolve_artifact_directory(job_id: str) -> Path:
+def resolve_artifact_directory(
+    job_id: str,
+    tool: str | None = None,
+) -> Path:
     if not _JOB_ID_PATTERN.fullmatch(job_id):
         raise ValueError("job_id must use the generated JOB-<uuid> format.")
+    if tool is not None:
+        root = artifact_root_directory(tool)
+        candidate = root / job_id
+        if candidate.is_symlink():
+            raise ValueError("Artifact job directory must not be a symbolic link.")
+        return candidate.resolve()
+
+    existing: list[Path] = []
+    roots = artifact_root_directories()
+    for root in roots:
+        candidate = root / job_id
+        if candidate.is_symlink():
+            raise ValueError("Artifact job directory must not be a symbolic link.")
+        if candidate.exists():
+            resolved = candidate.resolve()
+            if resolved.parent != root:
+                raise ValueError("Artifact job directory must be inside its tool root.")
+            existing.append(resolved)
+    if len(existing) > 1:
+        raise ValueError("Job ID exists in multiple tool artifact roots.")
+    if existing:
+        return existing[0]
     return (artifact_root_directory() / job_id).resolve()
 
 
-def artifact_root_directory() -> Path:
+def _configured_artifact_root(environment_variable: str, default: Path) -> Path:
     artifact_root = Path(
-        os.getenv(
-            "EXECUTION_ARTIFACTS_ROOT",
-            str(_DEFAULT_ARTIFACTS_ROOT),
-        )
+        os.getenv(environment_variable, str(default))
     ).expanduser()
     if not artifact_root.is_absolute():
         artifact_root = _PROJECT_ROOT / artifact_root
     return artifact_root.resolve()
 
 
-def artifact_directory_reference(job_id: str) -> str:
+def artifact_root_directory(tool: str | None = None) -> Path:
+    normalized_tool = tool.strip().lower() if isinstance(tool, str) else None
+    if normalized_tool == "k6":
+        if os.getenv("K6_EXECUTION_ARTIFACTS_ROOT"):
+            return _configured_artifact_root(
+                "K6_EXECUTION_ARTIFACTS_ROOT",
+                _DEFAULT_K6_ARTIFACTS_ROOT,
+            )
+        if os.getenv("EXECUTION_ARTIFACTS_ROOT"):
+            return _configured_artifact_root(
+                "EXECUTION_ARTIFACTS_ROOT",
+                _DEFAULT_K6_ARTIFACTS_ROOT,
+            )
+        return _configured_artifact_root(
+            "K6_EXECUTION_ARTIFACTS_ROOT",
+            _DEFAULT_K6_ARTIFACTS_ROOT,
+        )
+    if normalized_tool == "jmeter":
+        if os.getenv("JMETER_EXECUTION_ARTIFACTS_ROOT"):
+            return _configured_artifact_root(
+                "JMETER_EXECUTION_ARTIFACTS_ROOT",
+                _DEFAULT_JMETER_ARTIFACTS_ROOT,
+            )
+        if os.getenv("EXECUTION_ARTIFACTS_ROOT"):
+            return _configured_artifact_root(
+                "EXECUTION_ARTIFACTS_ROOT",
+                _DEFAULT_JMETER_ARTIFACTS_ROOT,
+            )
+        return _configured_artifact_root(
+            "JMETER_EXECUTION_ARTIFACTS_ROOT",
+            _DEFAULT_JMETER_ARTIFACTS_ROOT,
+        )
+    return _configured_artifact_root(
+        "EXECUTION_ARTIFACTS_ROOT",
+        _DEFAULT_ARTIFACTS_ROOT,
+    )
+
+
+def artifact_root_directories() -> list[Path]:
+    """Return unique known roots, including a configured legacy shared root."""
+    roots = [
+        artifact_root_directory("k6"),
+        artifact_root_directory("jmeter"),
+        artifact_root_directory(),
+    ]
+    return list(dict.fromkeys(roots))
+
+
+def artifact_directory_reference(
+    job_id: str,
+    tool: str | None = None,
+) -> str:
     """Return a stable project-relative artifact path when inside the repo."""
-    artifact_directory = resolve_artifact_directory(job_id)
+    artifact_directory = resolve_artifact_directory(job_id, tool=tool)
     try:
         return artifact_directory.relative_to(_PROJECT_ROOT).as_posix()
     except ValueError:
@@ -644,7 +807,10 @@ def create_execution_job_context(
 
     if job_id is None:
         job_id = f"JOB-{uuid.uuid4().hex}"
-    artifact_directory = resolve_artifact_directory(job_id)
+    artifact_directory = resolve_artifact_directory(
+        job_id,
+        tool=profile.tool if profile is not None else None,
+    )
 
     status: ExecutionStatus = "not_started"
     if mode == "REAL" and preflight.status == "needs_input":
@@ -674,17 +840,20 @@ def create_context_for_test_case(
     test_case: dict[str, Any],
     *,
     source_id: str | None = None,
+    requested_tool: str | None = None,
 ) -> dict[str, Any]:
     profile = workload_profile_from_test_case(test_case)
-    configured_mode = str(
-        test_case.get("execution_mode", "SIMULATED")
-    ).strip().upper()
-    if profile.tool == "k6":
+    if requested_tool is not None:
+        if requested_tool not in {"k6", "jmeter"}:
+            raise ValueError("Catalog performance tests support k6 or JMeter.")
+        profile = profile.model_copy(update={"tool": requested_tool})
+        mode = "REAL"
+    elif profile.tool == "k6":
         mode = "REAL"
     elif profile.tool in {"jmeter", "gatling"}:
         mode = "SIMULATED"
     else:
-        mode = configured_mode
+        mode = str(test_case.get("execution_mode", "SIMULATED")).strip().upper()
     return create_execution_job_context(
         execution_mode=mode,
         workload_profile=profile,
@@ -711,12 +880,16 @@ __all__ = [
     "ExecutionStatus",
     "artifact_directory_reference",
     "artifact_root_directory",
+    "artifact_root_directories",
     "ArtifactKey",
     "WorkloadProfile",
     "create_context_for_test_case",
     "create_execution_job_context",
     "extract_catalog_test_case_id",
     "is_k6_test_request",
+    "is_jmeter_test_request",
+    "requested_execution_tool",
+    "is_explicit_execution_request",
     "is_simulated_tool_request",
     "missing_profile_inputs",
     "real_execution_gate",

@@ -50,6 +50,12 @@ def _collect_real_monitoring_metrics(
     execution_value = state.get("test_execution_result")
     execution = execution_value if isinstance(execution_value, dict) else None
     job_id = str(state.get("job_id") or "unknown")
+    profile = state.get("workload_profile")
+    execution_data_source = (
+        profile.get("tool")
+        if isinstance(profile, dict) and profile.get("tool") in {"k6", "jmeter"}
+        else "unknown REAL load generator"
+    )
     application = (
         str(execution.get("application") or "unknown")
         if execution
@@ -111,7 +117,10 @@ def _collect_real_monitoring_metrics(
         )
 
     try:
-        job_directory = resolve_artifact_directory(job_id)
+        job_directory = resolve_artifact_directory(
+            job_id,
+            tool=execution_data_source if execution_data_source in {"k6", "jmeter"} else None,
+        )
         samples_path = (job_directory / samples_name).resolve()
         metadata_path = (job_directory / metadata_name).resolve()
         if (
@@ -257,7 +266,7 @@ def _collect_real_monitoring_metrics(
     else:
         status = "OK"
 
-    return {
+    monitoring_result = {
         "job_id": job_id,
         "application": application,
         "scenario": scenario,
@@ -266,10 +275,10 @@ def _collect_real_monitoring_metrics(
         "data_source": (
             (
                 "REAL (partial): psutil load-generator host samples and "
-                "k6 client-observed metrics"
+                f"{execution_data_source} client-observed metrics"
                 if sample_status == "partial"
                 else "REAL: psutil load-generator host samples and "
-                "k6 client-observed metrics"
+                f"{execution_data_source} client-observed metrics"
             )
         ),
         "sampling_status": sample_status,
@@ -300,13 +309,13 @@ def _collect_real_monitoring_metrics(
                 "target_resource_metric": False,
             },
             "response_time": {
-                "data_source": "k6",
+                "data_source": execution_data_source,
                 "measurement_scope": "load_generator_observed_http_traffic",
                 "statistic": "average_ms",
                 "target_resource_metric": False,
             },
             "tps": {
-                "data_source": "k6",
+                "data_source": execution_data_source,
                 "measurement_scope": "load_generator_observed_http_traffic",
                 "statistic": "requests_per_second",
                 "target_resource_metric": False,
@@ -329,6 +338,29 @@ def _collect_real_monitoring_metrics(
         "tps": float(throughput),
         "alerts": alerts,
     }
+    if execution_data_source == "jmeter":
+        monitoring_result.update(
+            {
+                "total_requests": execution.get("total_requests"),
+                "failed_requests": execution.get("failed_requests"),
+                "error_rate_pct": execution.get("error_rate"),
+                "latency_percentiles_ms": execution.get("latency_percentiles_ms"),
+            }
+        )
+        provenance = monitoring_result["measurement_provenance"]
+        for metric, statistic in (
+            ("total_requests", "sample_count"),
+            ("failed_requests", "failed_sample_count"),
+            ("error_rate_pct", "failed_samples_over_total_percent"),
+            ("latency_percentiles_ms", "JTL_sample_percentiles_ms"),
+        ):
+            provenance[metric] = {
+                "data_source": "jmeter JTL",
+                "measurement_scope": "load_generator_observed_http_traffic",
+                "statistic": statistic,
+                "target_resource_metric": False,
+            }
+    return monitoring_result
 
 
 def collect_monitoring_metrics(tool_context: ToolContext) -> dict:

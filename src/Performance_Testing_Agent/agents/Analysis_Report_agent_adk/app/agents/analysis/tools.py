@@ -188,18 +188,25 @@ def analyze_metrics(records: List[dict]) -> dict:
         else:
             severity, status = "medium", "warning"
 
+        finding_metrics = {
+            "total_requests": r.get("total_requests"),
+            "successful_requests": r.get("successful_requests"),
+            "failed_requests": r.get("failed_requests"),
+            "avg_response_time": avg,
+            "p95_response_time": p95,
+            "max_response_time": mx,
+            "throughput": throughput,
+            "error_rate_pct": round(err, 2),
+            "http_status": status_code,
+        }
+        latency_percentiles = r.get("latency_percentiles_ms")
+        if isinstance(latency_percentiles, dict):
+            finding_metrics["latency_percentiles_ms"] = latency_percentiles
         findings.append({
             "api_name": api,
             "status": status,
             "severity": severity,
-            "metrics": {
-                "total_requests": r.get("total_requests"),
-                "successful_requests": r.get("successful_requests"),
-                "failed_requests": r.get("failed_requests"),
-                "avg_response_time": avg, "p95_response_time": p95,
-                "max_response_time": mx, "throughput": throughput,
-                "error_rate_pct": round(err, 2), "http_status": status_code,
-            },
+            "metrics": finding_metrics,
             "anomalies": anomalies,
             "thresholds_breached": breached,
         })
@@ -225,6 +232,7 @@ def _pearson_correlation(left: list[float], right: list[float]) -> float | None:
 def _read_aligned_time_series(
     path: Path,
     run_started_at: datetime,
+    execution_data_source: str = "k6",
 ) -> list[dict[str, Any]]:
     required_fields = {
         "timestamp",
@@ -252,7 +260,7 @@ def _read_aligned_time_series(
             raise ValueError("The aligned time-series CSV is missing required fields.")
         for row_number, raw in enumerate(reader, start=2):
             if (
-                raw.get("execution_data_source") != "k6"
+                raw.get("execution_data_source") != execution_data_source
                 or raw.get("execution_measurement_scope")
                 != "load_generator_observed_http_traffic"
                 or raw.get("target_resource_metrics") != "false"
@@ -430,7 +438,10 @@ def _execution_report_context(
                 and value.strip()
             }
     try:
-        artifact_directory = artifact_directory_reference(job_id)
+        artifact_directory = artifact_directory_reference(
+            job_id,
+            tool=execution_profile.get("tool") if execution_profile else None,
+        )
     except ValueError:
         artifact_directory = None
 
@@ -542,8 +553,17 @@ def analyze_timeseries(tool_context: ToolContext) -> dict:
         }
 
     metadata: dict[str, Any]
+    profile = state.get("workload_profile")
+    execution_data_source = (
+        profile.get("tool")
+        if isinstance(profile, dict) and profile.get("tool") in {"k6", "jmeter"}
+        else "k6"
+    )
     try:
-        job_directory = resolve_artifact_directory(job_id)
+        job_directory = resolve_artifact_directory(
+            job_id,
+            tool=execution_data_source,
+        )
         series_path = (job_directory / series_name).resolve()
         metadata_path = (job_directory / metadata_name).resolve()
         if (
@@ -555,30 +575,35 @@ def analyze_timeseries(tool_context: ToolContext) -> dict:
             raise ValueError("The aligned time-series artifacts are missing or outside the job directory.")
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         shared_schema = metadata.get("shared_time_series") if isinstance(metadata, dict) else None
+        run_window_key = f"{execution_data_source}_run_window"
         if (
             not isinstance(metadata, dict)
             or metadata.get("job_id") != job_id
             or not isinstance(shared_schema, dict)
             or shared_schema.get("schema_version") != "1.0"
             or shared_schema.get("bucket_seconds") != 5
-            or shared_schema.get("alignment_origin") != "k6_run_window.started_at"
+            or shared_schema.get("alignment_origin") != f"{run_window_key}.started_at"
         ):
             raise ValueError("The aligned time-series metadata does not match schema 1.0.")
-        run_window = metadata.get("k6_run_window")
+        run_window = metadata.get(run_window_key)
         run_started_at_value = (
             run_window.get("started_at")
             if isinstance(run_window, dict)
             else None
         )
         if not isinstance(run_started_at_value, str):
-            raise ValueError("The aligned time-series metadata has no k6 start time.")
+            raise ValueError("The aligned time-series metadata has no execution start time.")
         run_started_at = datetime.fromisoformat(run_started_at_value)
         if (
             run_started_at.tzinfo is None
             or run_started_at.utcoffset() != timedelta(0)
         ):
-            raise ValueError("The k6 start time must be timezone-aware UTC.")
-        rows = _read_aligned_time_series(series_path, run_started_at)
+            raise ValueError("The execution start time must be timezone-aware UTC.")
+        rows = _read_aligned_time_series(
+            series_path,
+            run_started_at,
+            execution_data_source=execution_data_source,
+        )
     except (OSError, UnicodeError, ValueError, csv.Error, json.JSONDecodeError) as exc:
         return {
             **unavailable,
@@ -628,7 +653,7 @@ def analyze_timeseries(tool_context: ToolContext) -> dict:
         "execution_mode": "REAL",
         "time_series": {
             "status": "measured",
-            "data_source": "k6",
+            "data_source": execution_data_source,
             "measurement_scope": "load_generator_observed_http_traffic",
             "target_resource_metrics": False,
         },
@@ -648,7 +673,7 @@ def analyze_timeseries(tool_context: ToolContext) -> dict:
     }
     finding_provenance = {
         "execution_mode": "REAL",
-        "data_sources": ["k6"],
+        "data_sources": [execution_data_source],
     }
 
     latency_values = [row["avg_response_time_ms"] for row in measured_rows]
@@ -852,7 +877,7 @@ def analyze_timeseries(tool_context: ToolContext) -> dict:
                 "category": "post_ramp_degradation",
                 "severity": "warning",
                 "execution_mode": "REAL",
-                "data_sources": ["k6", "workload_profile"],
+                "data_sources": [execution_data_source, "workload_profile"],
                 "message": (
                     "Post-ramp latency or error rate exceeded the configured "
                     "degradation comparison threshold."

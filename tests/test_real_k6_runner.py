@@ -405,8 +405,8 @@ class TestRealK6Runner(unittest.TestCase):
         self.assertIn("tool", result["missing_inputs"])
         simulate.assert_not_called()
 
-    def test_jmeter_request_uses_simulated_path_even_in_real_session(self):
-        state = self._real_agent_state()
+    def test_jmeter_request_uses_real_preflight_without_simulated_fallback(self):
+        state = {}
         with patch(
             "app.agent.handle_test_request",
             return_value={"status": "success", "tool": "jmeter"},
@@ -420,11 +420,71 @@ class TestRealK6Runner(unittest.TestCase):
                 )(),
             )
 
-        self.assertEqual(result["tool"], "jmeter")
-        self.assertEqual(state["execution_mode"], "SIMULATED")
-        self.assertIsNone(state["monitoring_result"])
-        self.assertIsNone(state["analysis_result"])
-        simulate.assert_called_once()
+        self.assertEqual(result["execution_mode"], "REAL")
+        self.assertEqual(result["status"], "needs_input")
+        self.assertIn("tool", result["missing_inputs"])
+        simulate.assert_not_called()
+
+    def test_jmeter_percentiles_are_preserved_for_downstream_analysis(self):
+        state = self._real_agent_state()
+        state["workload_profile"] = {
+            **self.profile,
+            "tool": "jmeter",
+        }
+        percentiles = {"p50": 12.0, "p90": 19.0, "p95": 22.0, "p99": 30.0}
+        execution_result = {
+            "status": "completed",
+            "execution_mode": "REAL",
+            "job_id": self.job_id,
+            "metrics": {
+                "job_id": self.job_id,
+                "application": "Payments",
+                "scenario": "Payment API Load Test",
+                "api_name": "Payment API",
+                "total_requests": 10,
+                "successful_requests": 10,
+                "failed_requests": 0,
+                "avg_response_time": 15.0,
+                "p95_response_time": 22.0,
+                "max_response_time": 30.0,
+                "throughput": 2.5,
+                "error_rate": 0.0,
+                "http_status": 200,
+            },
+            "latency_percentiles_ms": percentiles,
+            "artifacts": {},
+        }
+
+        with (
+            patch(
+                "app.agent.generate_script",
+                return_value={
+                    "status": "success",
+                    "message": "plan prepared",
+                    "file_path": str(self.script_path),
+                    "artifact_path": self.script_path.name,
+                },
+            ),
+            patch(
+                "app.agent.run_real_jmeter_test",
+                return_value=execution_result,
+            ) as run,
+        ):
+            result = run_test_execution_adk(
+                "Run the JMeter test",
+                type(
+                    "ToolContextStub",
+                    (),
+                    {"state": State(state, {})},
+                )(),
+            )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(
+            state["test_execution_result"]["latency_percentiles_ms"],
+            percentiles,
+        )
+        run.assert_called_once()
 
     def test_runner_failure_is_execution_error_and_clears_stale_metrics(self):
         state = self._real_agent_state()

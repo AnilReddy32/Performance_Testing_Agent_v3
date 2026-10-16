@@ -1,0 +1,14 @@
+timestamp,elapsed_seconds,bucket_duration_seconds,requests,successful_requests,failed_requests,avg_response_time_ms,throughput_rps,cpu_avg_percent,cpu_peak_percent,memory_avg_percent,memory_peak_percent,execution_data_source,execution_measurement_scope,monitoring_data_source,monitoring_measurement_scope,target_resource_metrics
+2026-10-16T12:20:43.576493+00:00,0,5,53,53,0,232.60377358490567,10.6,18.325,22.9,80.725,81.4,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:20:48.576493+00:00,5,5,56,56,0,172.625,11.2,11.78,15.0,79.46000000000001,79.8,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:20:53.576493+00:00,10,5,60,60,0,226.0,12.0,10.28,11.8,79.14,79.3,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:20:58.576493+00:00,15,5,61,61,0,238.81967213114754,12.2,14.98,24.0,79.44000000000001,79.5,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:03.576493+00:00,20,5,59,59,0,185.61016949152543,11.8,9.6,10.2,79.36,79.4,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:08.576493+00:00,25,5,61,61,0,159.86885245901638,12.2,9.18,9.7,79.4,79.4,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:13.576493+00:00,30,5,61,61,0,204.13114754098362,12.2,9.26,9.8,79.3,79.4,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:18.576493+00:00,35,5,60,60,0,176.78333333333333,12.0,9.16,9.8,79.3,79.3,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:23.576493+00:00,40,5,61,61,0,206.672131147541,12.2,9.120000000000001,9.7,79.3,79.3,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:28.576493+00:00,45,5,59,59,0,213.27118644067798,11.8,9.58,11.7,79.24,79.3,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:33.576493+00:00,50,5,59,59,0,218.79661016949152,11.8,8.86,9.2,79.3,79.3,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:38.576493+00:00,55,5,61,61,0,226.04918032786884,12.2,9.02,9.3,79.24,79.3,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:21:43.576493+00:00,60,2.855383,9,9,0,265.77777777777777,3.151941438328939,8.933333333333334,9.3,79.2,79.2,jmeter,load_generator_observed_http_traffic,psutil,load_generator_host,false

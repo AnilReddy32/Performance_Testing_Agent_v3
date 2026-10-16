@@ -88,6 +88,17 @@ def _build_agent_activity_rows(
         te_blocks = []
         for f in api_findings:
             m = f.get("metrics", {})
+            percentiles = m.get("latency_percentiles_ms")
+            percentile_summary = (
+                "\nLatency percentiles (ms): "
+                + ", ".join(
+                    f"{name}={percentiles[name]}"
+                    for name in ("p50", "p90", "p95", "p99")
+                    if isinstance(percentiles, dict) and name in percentiles
+                )
+                if isinstance(percentiles, dict) and percentiles
+                else ""
+            )
             te_blocks.append(
                 f"Load test executed on {f.get('api_name', 'Unknown API')} "
                 f"({application} - {scenario}).\n"
@@ -99,6 +110,7 @@ def _build_agent_activity_rows(
                 f"Max: {m.get('max_response_time')} ms.\n"
                 f"Throughput: {m.get('throughput')} TPS; "
                 f"Error rate: {m.get('error_rate_pct')}%."
+                f"{percentile_summary}"
             )
         rows.append(("Test Execution", "\n\n".join(te_blocks)))
     else:
@@ -201,8 +213,9 @@ def _package_native_execution_artifacts(
     job_id: str,
     execution_mode: Optional[str],
     execution_artifacts: Optional[dict[str, str]],
+    tool: str | None = None,
 ) -> dict[str, str]:
-    """Package the current REAL run's native HTML report and raw k6 results."""
+    """Package native report and raw result files unless the runner did so."""
     if (execution_mode or "").upper() != "REAL":
         return {}
     artifacts = execution_artifacts or {}
@@ -211,7 +224,7 @@ def _package_native_execution_artifacts(
     if not native_name and not raw_name:
         return {}
 
-    job_directory = resolve_artifact_directory(job_id)
+    job_directory = resolve_artifact_directory(job_id, tool=tool)
     source_paths: dict[str, Path] = {}
     for artifact_key, artifact_name in (
         ("native_report", native_name),
@@ -219,12 +232,17 @@ def _package_native_execution_artifacts(
     ):
         if not artifact_name:
             continue
-        if Path(artifact_name).name != artifact_name:
+        relative_path = Path(artifact_name)
+        if (
+            relative_path.is_absolute()
+            or relative_path.as_posix() != artifact_name
+            or any(part in {"", ".", ".."} for part in relative_path.parts)
+        ):
             raise ValueError(
-                f"Execution artifact '{artifact_key}' must be a job-local filename."
+                f"Execution artifact '{artifact_key}' must be a safe job-local path."
             )
-        source_path = (job_directory / artifact_name).resolve()
-        if source_path.parent != job_directory or not source_path.is_file():
+        source_path = (job_directory / relative_path).resolve()
+        if not source_path.is_relative_to(job_directory) or not source_path.is_file():
             raise ValueError(
                 f"Execution artifact '{artifact_key}' is missing or outside "
                 "the current job directory."
@@ -232,9 +250,19 @@ def _package_native_execution_artifacts(
         source_paths[artifact_key] = source_path
 
     references = {
-        artifact_key: source_path.name
+        artifact_key: source_paths[artifact_key].relative_to(job_directory).as_posix()
         for artifact_key, source_path in source_paths.items()
     }
+    existing_archive = artifacts.get("native_report_archive")
+    if existing_archive:
+        archive_path = (job_directory / existing_archive).resolve()
+        if (
+            archive_path.is_relative_to(job_directory)
+            and archive_path.is_file()
+            and not archive_path.is_symlink()
+        ):
+            references["native_report_archive"] = archive_path.relative_to(job_directory).as_posix()
+            return references
     if len(source_paths) != 2:
         return references
 
@@ -253,10 +281,16 @@ def _package_native_execution_artifacts(
             mode="w",
             compression=zipfile.ZIP_DEFLATED,
         ) as archive:
-            archive.write(
-                source_paths["native_report"],
-                arcname=f"native_report/{native_name}",
-            )
+            native_path = source_paths["native_report"]
+            if native_path.is_dir():
+                for report_file in native_path.rglob("*"):
+                    if report_file.is_file():
+                        archive.write(
+                            report_file,
+                            arcname=(Path("native_report") / report_file.relative_to(native_path)).as_posix(),
+                        )
+            else:
+                archive.write(native_path, arcname=f"native_report/{native_path.name}")
             archive.write(
                 source_paths["raw_results"],
                 arcname=f"raw_results/{raw_name}",
@@ -299,6 +333,8 @@ def build_report_sections(
     execution_profile: Optional[dict] = None,
     execution_artifact_directory: Optional[str] = None,
     execution_artifacts: Optional[dict[str, str]] = None,
+    execution_status: Optional[str] = None,
+    execution_outcome: Optional[dict] = None,
 ) -> dict:
     """Builds the ordered list of report sections. Returns
     {"sections": [...], "rejected": bool}.
@@ -314,7 +350,11 @@ def build_report_sections(
             "content": test_case_prompt,
         })
 
-    if data_quality_status == "invalid":
+    terminal_real_run = (
+        (execution_mode or "").upper() == "REAL"
+        and execution_status in {"completed", "failed"}
+    )
+    if data_quality_status == "invalid" and not terminal_real_run:
         sections.append({
             "title": "Report Not Generated -- Invalid Data",
             "content": (
@@ -326,6 +366,51 @@ def build_report_sections(
             ),
         })
         return {"sections": sections, "rejected": True}
+
+    if terminal_real_run:
+        outcome = execution_outcome or {}
+        outcome_lines = [
+            f"Execution status: {execution_status.upper()}",
+            f"Runner status: {outcome.get('runner_status', 'unknown')}",
+        ]
+        if outcome.get("message"):
+            outcome_lines.append(f"Outcome details: {escape(str(outcome['message']))}")
+        for field, label in (
+            ("exit_code", "Process exit code"),
+            ("thresholds_passed", "Thresholds passed"),
+            ("threshold_failures", "Threshold failures"),
+            ("blocked_reasons", "Execution restrictions"),
+        ):
+            if outcome.get(field) not in (None, [], {}):
+                outcome_lines.append(f"{label}: {escape(str(outcome[field]))}")
+        if data_quality_status == "invalid":
+            outcome_lines.append(
+                "Performance measurements were unavailable or failed quality validation; "
+                f"reason: {escape(str(unusable_reason or 'not provided'))}"
+            )
+        for result_key, label, reported_summary in (
+            ("monitoring_result", "Available monitoring input", infra_health),
+            ("security_result", "Available security input", security_summary),
+        ):
+            result = outcome.get(result_key)
+            if reported_summary is None and isinstance(result, dict):
+                visible_fields = (
+                    "status", "monitoring_reported_status", "cpu_usage",
+                    "memory_usage", "db_connections", "tps",
+                    "monitoring_response_time", "security_score", "alerts",
+                    "anomalies", "issues", "recommendations", "message",
+                )
+                details = [
+                    f"{field}={escape(str(result[field]))}"
+                    for field in visible_fields
+                    if field in result and result[field] not in (None, [], {})
+                ]
+                if details:
+                    outcome_lines.append(f"{label}: " + "; ".join(details))
+        sections.append({
+            "title": "REAL Execution Outcome",
+            "content": "\n".join(outcome_lines),
+        })
 
     chart_series = (
         time_series_analysis.get("series", [])
@@ -360,7 +445,11 @@ def build_report_sections(
                     "data_source": (
                         "psutil load-generator host"
                         if metric == "cpu_avg_percent"
-                        else "k6 client-observed HTTP traffic"
+                        else (
+                            "JMeter client-observed HTTP traffic"
+                            if "jmeter" in str((execution_profile or {}).get("tool", "")).lower()
+                            else "k6 client-observed HTTP traffic"
+                        )
                     ),
                 }
             )
@@ -380,12 +469,16 @@ def build_report_sections(
         job_id,
         execution_mode,
         execution_artifacts,
+        tool=(execution_profile or {}).get("tool"),
     )
     report_artifacts = dict(execution_artifacts or {})
     report_artifacts.update(packaged_references)
     report_artifact_directory = execution_artifact_directory
     if (execution_mode or "").upper() == "REAL":
-        report_artifact_directory = artifact_directory_reference(job_id)
+        report_artifact_directory = artifact_directory_reference(
+            job_id,
+            tool=(execution_profile or {}).get("tool"),
+        )
     execution_lines = [
         f"Execution mode: {(execution_mode or 'UNKNOWN').upper()}",
     ]
@@ -417,11 +510,13 @@ def build_report_sections(
                 "raw_results",
                 "native_report_archive",
             }:
+                tool_name = str((execution_profile or {}).get("tool", "")).lower()
+                is_jmeter = "jmeter" in tool_name
                 label = {
-                    "native_report": "Native k6 HTML report",
-                    "raw_results": "Raw k6 results (JSON)",
+                    "native_report": "Native JMeter HTML dashboard" if is_jmeter else "Native k6 HTML report",
+                    "raw_results": "Raw JMeter results (JTL)" if is_jmeter else "Raw k6 results (JSON)",
                     "native_report_archive": (
-                        "Native report + raw results ZIP"
+                        "JMeter dashboard + raw JTL ZIP" if is_jmeter else "Native report + raw results ZIP"
                     ),
                 }[artifact_name]
                 artifact_url = _artifact_download_url(job_id, artifact_name)
@@ -432,7 +527,7 @@ def build_report_sections(
                 execution_lines.append(f"  - {artifact_name}: {reference}")
         if packaged_references:
             execution_lines.append(
-                "The interactive HTML dashboard is linked as a separate "
+                "The interactive native HTML dashboard is linked as a separate "
                 "artifact and is not embedded in this PDF."
             )
         if (
@@ -816,16 +911,23 @@ async def finalize_report(
         fmt = "both" if want_txt else "pdf"
 
     report_artifacts: dict[str, str] = {}
+    workload_profile = tool_context.state.get("workload_profile")
+    execution_tool = (
+        workload_profile.get("tool")
+        if isinstance(workload_profile, dict)
+        else None
+    )
     if not rejected and job_id.startswith("JOB-"):
         local_pdf = Path(REPORTS_DIR) / f"{job_id}_report.pdf"
         if local_pdf.is_file():
-            job_directory = resolve_artifact_directory(job_id)
+            job_directory = resolve_artifact_directory(job_id, tool=execution_tool)
             job_directory.mkdir(parents=True, exist_ok=True)
             consolidated_pdf = job_directory / f"{job_id}_report.pdf"
             shutil.copy2(local_pdf, consolidated_pdf)
             report_artifacts["consolidated_report"] = consolidated_pdf.name
         native_archive = (
-            resolve_artifact_directory(job_id) / f"{job_id}_native_report.zip"
+            resolve_artifact_directory(job_id, tool=execution_tool)
+            / f"{job_id}_native_report.zip"
         )
         if native_archive.is_file():
             report_artifacts["native_report_archive"] = native_archive.name

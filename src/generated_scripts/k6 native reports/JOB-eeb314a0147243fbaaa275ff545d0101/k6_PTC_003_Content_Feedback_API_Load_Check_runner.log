@@ -1,0 +1,334 @@
+===== k6 inspect stdout =====
+{
+  "paused": null,
+  "vus": null,
+  "duration": null,
+  "iterations": null,
+  "stages": [
+    {
+      "duration": "5s",
+      "target": 15
+    },
+    {
+      "duration": "50s",
+      "target": 15
+    },
+    {
+      "duration": "5s",
+      "target": 0
+    }
+  ],
+  "scenarios": null,
+  "executionSegment": null,
+  "executionSegmentSequence": null,
+  "noSetup": null,
+  "setupTimeout": null,
+  "noTeardown": null,
+  "teardownTimeout": null,
+  "handleSummaryTimeout": null,
+  "rps": 10,
+  "dns": {
+    "ttl": null,
+    "select": null,
+    "policy": null
+  },
+  "maxRedirects": null,
+  "userAgent": null,
+  "batch": null,
+  "batchPerHost": null,
+  "httpDebug": null,
+  "insecureSkipTLSVerify": null,
+  "tlsCipherSuites": null,
+  "tlsVersion": null,
+  "tlsAuth": null,
+  "throw": null,
+  "thresholds": {
+    "checks": [
+      "rate\u003e0.99"
+    ],
+    "http_req_duration": [
+      "p(95)\u003c5000"
+    ],
+    "http_req_failed": [
+      "rate\u003c0.01"
+    ]
+  },
+  "blacklistIPs": null,
+  "blockHostnames": null,
+  "hosts": null,
+  "noConnectionReuse": null,
+  "noVUConnectionReuse": null,
+  "minIterationDuration": null,
+  "ext": null,
+  "summaryTrendStats": null,
+  "summaryTimeUnit": null,
+  "systemTags": null,
+  "tags": {
+    "endpoint": "/posts/1/comments",
+    "environment": "external_api",
+    "test_case_id": "PTC-003"
+  },
+  "metricSamplesBufferSize": null,
+  "noCookiesReset": null,
+  "discardResponseBodies": null,
+  "features": null
+}
+===== k6 inspect stderr =====
+
+===== k6 run stdout =====
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/k6 native reports/JOB-eeb314a0147243fbaaa275ff545d0101/k6_PTC_003_Content_Feedback_API_Load_Check.js
+ web dashboard:
+        output: json (/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/k6 native reports/JOB-eeb314a0147243fbaaa275ff545d0101/k6_PTC_003_Content_Feedback_API_Load_Check_raw.json)
+
+     scenarios: (100.00%) 1 scenario, 15 max VUs, 1m30s max duration (incl. graceful stop):
+              * default: Up to 15 looping VUs for 1m0s over 3 stages (gracefulRampDown: 30s, gracefulStop: 30s)
+
+
+running (0m01.0s), 03/15 VUs, 4 complete and 0 interrupted iterations
+default   [   2% ] 03/15 VUs  0m01.0s/1m00.0s
+
+running (0m02.0s), 06/15 VUs, 14 complete and 0 interrupted iterations
+default   [   3% ] 06/15 VUs  0m02.0s/1m00.0s
+
+running (0m03.0s), 09/15 VUs, 25 complete and 0 interrupted iterations
+default   [   5% ] 09/15 VUs  0m03.0s/1m00.0s
+
+running (0m04.0s), 12/15 VUs, 34 complete and 0 interrupted iterations
+default   [   7% ] 12/15 VUs  0m04.0s/1m00.0s
+
+running (0m05.0s), 14/15 VUs, 44 complete and 0 interrupted iterations
+default   [   8% ] 14/15 VUs  0m05.0s/1m00.0s
+
+running (0m06.0s), 15/15 VUs, 51 complete and 0 interrupted iterations
+default   [  10% ] 15/15 VUs  0m06.0s/1m00.0s
+
+running (0m07.0s), 15/15 VUs, 62 complete and 0 interrupted iterations
+default   [  12% ] 15/15 VUs  0m07.0s/1m00.0s
+
+running (0m08.0s), 15/15 VUs, 72 complete and 0 interrupted iterations
+default   [  13% ] 15/15 VUs  0m08.0s/1m00.0s
+
+running (0m09.0s), 15/15 VUs, 83 complete and 0 interrupted iterations
+default   [  15% ] 15/15 VUs  0m09.0s/1m00.0s
+
+running (0m10.0s), 15/15 VUs, 93 complete and 0 interrupted iterations
+default   [  17% ] 15/15 VUs  0m10.0s/1m00.0s
+
+running (0m11.0s), 15/15 VUs, 102 complete and 0 interrupted iterations
+default   [  18% ] 15/15 VUs  0m11.0s/1m00.0s
+
+running (0m12.0s), 15/15 VUs, 112 complete and 0 interrupted iterations
+default   [  20% ] 15/15 VUs  0m12.0s/1m00.0s
+
+running (0m13.0s), 15/15 VUs, 121 complete and 0 interrupted iterations
+default   [  22% ] 15/15 VUs  0m13.0s/1m00.0s
+
+running (0m14.0s), 15/15 VUs, 133 complete and 0 interrupted iterations
+default   [  23% ] 15/15 VUs  0m14.0s/1m00.0s
+
+running (0m15.0s), 15/15 VUs, 140 complete and 0 interrupted iterations
+default   [  25% ] 15/15 VUs  0m15.0s/1m00.0s
+
+running (0m16.0s), 15/15 VUs, 152 complete and 0 interrupted iterations
+default   [  27% ] 15/15 VUs  0m16.0s/1m00.0s
+
+running (0m17.0s), 15/15 VUs, 163 complete and 0 interrupted iterations
+default   [  28% ] 15/15 VUs  0m17.0s/1m00.0s
+
+running (0m18.0s), 15/15 VUs, 173 complete and 0 interrupted iterations
+default   [  30% ] 15/15 VUs  0m18.0s/1m00.0s
+
+running (0m19.0s), 15/15 VUs, 182 complete and 0 interrupted iterations
+default   [  32% ] 15/15 VUs  0m19.0s/1m00.0s
+
+running (0m20.0s), 15/15 VUs, 193 complete and 0 interrupted iterations
+default   [  33% ] 15/15 VUs  0m20.0s/1m00.0s
+
+running (0m21.0s), 15/15 VUs, 202 complete and 0 interrupted iterations
+default   [  35% ] 15/15 VUs  0m21.0s/1m00.0s
+
+running (0m22.0s), 15/15 VUs, 212 complete and 0 interrupted iterations
+default   [  37% ] 15/15 VUs  0m22.0s/1m00.0s
+
+running (0m23.0s), 15/15 VUs, 222 complete and 0 interrupted iterations
+default   [  38% ] 15/15 VUs  0m23.0s/1m00.0s
+
+running (0m24.0s), 15/15 VUs, 233 complete and 0 interrupted iterations
+default   [  40% ] 15/15 VUs  0m24.0s/1m00.0s
+
+running (0m25.0s), 15/15 VUs, 243 complete and 0 interrupted iterations
+default   [  42% ] 15/15 VUs  0m25.0s/1m00.0s
+
+running (0m26.0s), 15/15 VUs, 252 complete and 0 interrupted iterations
+default   [  43% ] 15/15 VUs  0m26.0s/1m00.0s
+
+running (0m27.0s), 15/15 VUs, 262 complete and 0 interrupted iterations
+default   [  45% ] 15/15 VUs  0m27.0s/1m00.0s
+
+running (0m28.0s), 15/15 VUs, 273 complete and 0 interrupted iterations
+default   [  47% ] 15/15 VUs  0m28.0s/1m00.0s
+
+running (0m29.0s), 15/15 VUs, 284 complete and 0 interrupted iterations
+default   [  48% ] 15/15 VUs  0m29.0s/1m00.0s
+
+running (0m30.0s), 15/15 VUs, 293 complete and 0 interrupted iterations
+default   [  50% ] 15/15 VUs  0m30.0s/1m00.0s
+
+running (0m31.0s), 15/15 VUs, 303 complete and 0 interrupted iterations
+default   [  52% ] 15/15 VUs  0m31.0s/1m00.0s
+
+running (0m32.0s), 15/15 VUs, 312 complete and 0 interrupted iterations
+default   [  53% ] 15/15 VUs  0m32.0s/1m00.0s
+
+running (0m33.0s), 15/15 VUs, 323 complete and 0 interrupted iterations
+default   [  55% ] 15/15 VUs  0m33.0s/1m00.0s
+
+running (0m34.0s), 15/15 VUs, 332 complete and 0 interrupted iterations
+default   [  57% ] 15/15 VUs  0m34.0s/1m00.0s
+
+running (0m35.0s), 15/15 VUs, 346 complete and 0 interrupted iterations
+default   [  58% ] 15/15 VUs  0m35.0s/1m00.0s
+
+running (0m36.0s), 15/15 VUs, 354 complete and 0 interrupted iterations
+default   [  60% ] 15/15 VUs  0m36.0s/1m00.0s
+
+running (0m37.0s), 15/15 VUs, 363 complete and 0 interrupted iterations
+default   [  62% ] 15/15 VUs  0m37.0s/1m00.0s
+
+running (0m38.0s), 15/15 VUs, 375 complete and 0 interrupted iterations
+default   [  63% ] 15/15 VUs  0m38.0s/1m00.0s
+
+running (0m39.0s), 15/15 VUs, 386 complete and 0 interrupted iterations
+default   [  65% ] 15/15 VUs  0m39.0s/1m00.0s
+
+running (0m40.0s), 15/15 VUs, 394 complete and 0 interrupted iterations
+default   [  67% ] 15/15 VUs  0m40.0s/1m00.0s
+
+running (0m41.0s), 15/15 VUs, 404 complete and 0 interrupted iterations
+default   [  68% ] 15/15 VUs  0m41.0s/1m00.0s
+
+running (0m42.0s), 15/15 VUs, 415 complete and 0 interrupted iterations
+default   [  70% ] 15/15 VUs  0m42.0s/1m00.0s
+
+running (0m43.0s), 15/15 VUs, 424 complete and 0 interrupted iterations
+default   [  72% ] 15/15 VUs  0m43.0s/1m00.0s
+
+running (0m44.0s), 15/15 VUs, 435 complete and 0 interrupted iterations
+default   [  73% ] 15/15 VUs  0m44.0s/1m00.0s
+
+running (0m45.0s), 15/15 VUs, 445 complete and 0 interrupted iterations
+default   [  75% ] 15/15 VUs  0m45.0s/1m00.0s
+
+running (0m46.0s), 15/15 VUs, 455 complete and 0 interrupted iterations
+default   [  77% ] 15/15 VUs  0m46.0s/1m00.0s
+
+running (0m47.0s), 15/15 VUs, 464 complete and 0 interrupted iterations
+default   [  78% ] 15/15 VUs  0m47.0s/1m00.0s
+
+running (0m48.0s), 15/15 VUs, 474 complete and 0 interrupted iterations
+default   [  80% ] 15/15 VUs  0m48.0s/1m00.0s
+
+running (0m49.0s), 15/15 VUs, 483 complete and 0 interrupted iterations
+default   [  82% ] 15/15 VUs  0m49.0s/1m00.0s
+
+running (0m50.0s), 15/15 VUs, 495 complete and 0 interrupted iterations
+default   [  83% ] 15/15 VUs  0m50.0s/1m00.0s
+
+running (0m51.0s), 15/15 VUs, 505 complete and 0 interrupted iterations
+default   [  85% ] 15/15 VUs  0m51.0s/1m00.0s
+
+running (0m52.0s), 15/15 VUs, 515 complete and 0 interrupted iterations
+default   [  87% ] 15/15 VUs  0m52.0s/1m00.0s
+
+running (0m53.0s), 15/15 VUs, 524 complete and 0 interrupted iterations
+default   [  88% ] 15/15 VUs  0m53.0s/1m00.0s
+
+running (0m54.0s), 15/15 VUs, 535 complete and 0 interrupted iterations
+default   [  90% ] 15/15 VUs  0m54.0s/1m00.0s
+
+running (0m55.0s), 15/15 VUs, 543 complete and 0 interrupted iterations
+default   [  92% ] 15/15 VUs  0m55.0s/1m00.0s
+
+running (0m56.0s), 14/15 VUs, 552 complete and 0 interrupted iterations
+default   [  93% ] 14/15 VUs  0m56.0s/1m00.0s
+
+running (0m57.0s), 11/15 VUs, 564 complete and 0 interrupted iterations
+default   [  95% ] 11/15 VUs  0m57.0s/1m00.0s
+
+running (0m58.0s), 08/15 VUs, 573 complete and 0 interrupted iterations
+default   [  97% ] 08/15 VUs  0m58.0s/1m00.0s
+
+running (0m59.0s), 04/15 VUs, 584 complete and 0 interrupted iterations
+default   [  98% ] 04/15 VUs  0m59.0s/1m00.0s
+
+running (1m00.0s), 02/15 VUs, 593 complete and 0 interrupted iterations
+default   [ 100% ] 02/15 VUs  1m00.0s/1m00.0s
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✗ 'rate>0.99' rate=98.99%
+
+    http_req_duration
+    ✓ 'p(95)<5000' p(95)=447.79ms
+
+    http_req_failed
+    ✗ 'rate<0.01' rate=1.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 595    9.890529/s
+    checks_succeeded...: 98.99% 589 out of 595
+    checks_failed......: 1.00%  6 out of 595
+
+    ✗ expected HTTP 200
+      ↳  98% — ✓ 589 / ✗ 6
+
+    HTTP
+    http_req_blocked...............: avg=10.79ms   min=0.00ms   med=0.00ms    max=514.80ms   p(90)=0.00ms    p(95)=0.00ms   
+    http_req_connecting............: avg=4.58ms    min=0.00ms   med=0.00ms    max=194.81ms   p(90)=0.00ms    p(95)=0.00ms   
+    http_req_duration..............: avg=238.61ms  min=0.00ms   med=170.55ms  max=2570.92ms  p(90)=306.36ms  p(95)=447.79ms 
+      { expected_response:true }...: avg=239.72ms  min=78.70ms  med=170.55ms  max=2570.92ms  p(90)=306.50ms  p(95)=452.00ms 
+    http_req_failed................: 1.00%  6 out of 595
+    http_req_receiving.............: avg=16.32ms   min=0.00ms   med=0.18ms    max=1192.28ms  p(90)=6.23ms    p(95)=17.04ms  
+    http_req_sending...............: avg=0.20ms    min=0.00ms   med=0.21ms    max=0.64ms     p(90)=0.25ms    p(95)=0.28ms   
+    http_req_tls_handshaking.......: avg=6.20ms    min=0.00ms   med=0.00ms    max=320.70ms   p(90)=0.00ms    p(95)=0.00ms   
+    http_req_waiting...............: avg=222.09ms  min=0.00ms   med=168.91ms  max=2424.12ms  p(90)=300.12ms  p(95)=319.60ms 
+    http_reqs......................: 595    9.890529/s
+
+    EXECUTION
+    iteration_duration.............: avg=1402.89ms min=159.15ms med=1307.66ms max=30939.44ms p(90)=1594.22ms p(95)=1711.89ms
+    iterations.....................: 595    9.890529/s
+    vus............................: 2      min=2        max=15
+    vus_max........................: 15     min=15       max=15
+
+    NETWORK
+    data_received..................: 1.2 MB 21 kB/s
+    data_sent......................: 62 kB  1.0 kB/s
+
+
+
+
+running (1m00.2s), 00/15 VUs, 595 complete and 0 interrupted iterations
+default ✓ [ 100% ] 00/15 VUs  1m0s
+
+===== k6 run stderr =====
+time="2026-10-16T17:31:05+05:30" level=warning msg="Request Failed" error="Get \"https://jsonplaceholder.typicode.com/posts/1/comments\": dial: i/o timeout"
+time="2026-10-16T17:31:06+05:30" level=warning msg="Request Failed" error="Get \"https://jsonplaceholder.typicode.com/posts/1/comments\": dial: i/o timeout"
+time="2026-10-16T17:31:22+05:30" level=warning msg="Request Failed" error="Get \"https://jsonplaceholder.typicode.com/posts/1/comments\": read tcp 192.168.31.163:57019->104.21.59.19:443: read: connection reset by peer"
+time="2026-10-16T17:31:25+05:30" level=warning msg="Request Failed" error="Get \"https://jsonplaceholder.typicode.com/posts/1/comments\": read tcp 192.168.31.163:57029->104.21.59.19:443: read: connection reset by peer"
+time="2026-10-16T17:31:26+05:30" level=warning msg="Request Failed" error="Get \"https://jsonplaceholder.typicode.com/posts/1/comments\": read tcp 192.168.31.163:57024->104.21.59.19:443: read: connection reset by peer"
+time="2026-10-16T17:31:27+05:30" level=warning msg="Request Failed" error="Get \"https://jsonplaceholder.typicode.com/posts/1/comments\": read tcp 192.168.31.163:57017->104.21.59.19:443: read: connection reset by peer"
+time="2026-10-16T17:31:31+05:30" level=error msg="thresholds on metrics 'checks, http_req_failed' have been crossed"
+

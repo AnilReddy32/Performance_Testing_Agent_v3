@@ -1,10 +1,13 @@
 import os
 import re
+import tempfile
 from pathlib import Path
 
 from app.tools.artifact_generator import ArtifactGenerator
+from app.tools.jmeter_template import build_real_jmeter_plan
 from app.tools.k6_template import build_real_k6_script
 from Performance_Testing_Agent.execution_context import (
+    artifact_root_directory,
     resolve_artifact_directory,
     workload_profile_from_test_case,
 )
@@ -48,6 +51,118 @@ def generate_script(
         }
 
     if execution_mode == "REAL":
+        if tool == "jmeter":
+            if not isinstance(workload_profile, dict):
+                return {
+                    "status": "error",
+                    "message": (
+                        "REAL JMeter script generation requires the trusted "
+                        "workload profile from session state."
+                    ),
+                    "tool": tool,
+                    "execution_mode": execution_mode,
+                }
+            if not job_id:
+                return {
+                    "status": "error",
+                    "message": "REAL JMeter script generation requires a job_id.",
+                    "tool": tool,
+                    "execution_mode": execution_mode,
+                }
+            if artifact_directory is None:
+                return {
+                    "status": "error",
+                    "message": (
+                        "REAL JMeter script generation requires the job "
+                        "artifact directory."
+                    ),
+                    "tool": tool,
+                    "execution_mode": execution_mode,
+                }
+
+            try:
+                profile = workload_profile_from_test_case(
+                    {"workload_profile": workload_profile}
+                )
+                artifact_root = artifact_root_directory("jmeter")
+                expected_directory = resolve_artifact_directory(
+                    job_id,
+                    tool="jmeter",
+                )
+                candidate_directory = artifact_root / job_id
+                if candidate_directory.is_symlink():
+                    raise ValueError(
+                        "The JMeter job artifact directory cannot be a symbolic link."
+                    )
+                if expected_directory.parent != artifact_root:
+                    raise ValueError(
+                        "The JMeter job artifact directory is outside the artifact root."
+                    )
+                supplied_directory = Path(artifact_directory).expanduser().resolve()
+                if supplied_directory != expected_directory:
+                    raise ValueError(
+                        "The supplied artifact directory does not match this job."
+                    )
+
+                script_content = build_real_jmeter_plan(
+                    profile.model_dump(mode="json"),
+                    test_case_id=test_case_id,
+                )
+                safe_test_case_id = _sanitize_filename(test_case_id or "")[:64]
+                filename_part = safe_test_case_id or "api_test"
+                file_name = f"jmeter_{filename_part}_plan.jmx"
+                job_directory = expected_directory
+                job_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+                if job_directory.is_symlink() or job_directory.resolve() != job_directory:
+                    raise ValueError(
+                        "The JMeter job artifact directory changed during generation."
+                    )
+
+                script_path = job_directory / file_name
+                file_descriptor, temporary_name = tempfile.mkstemp(
+                    prefix=f".{file_name}.",
+                    suffix=".tmp",
+                    dir=job_directory,
+                )
+                try:
+                    with os.fdopen(
+                        file_descriptor,
+                        "w",
+                        encoding="utf-8",
+                        newline="\n",
+                    ) as script_file:
+                        os.fchmod(script_file.fileno(), 0o644)
+                        script_file.write(script_content)
+                        script_file.flush()
+                        os.fsync(script_file.fileno())
+                    os.replace(temporary_name, script_path)
+                finally:
+                    Path(temporary_name).unlink(missing_ok=True)
+            except (OSError, RuntimeError, ValueError) as exc:
+                return {
+                    "status": "error",
+                    "message": str(exc),
+                    "tool": tool,
+                    "execution_mode": execution_mode,
+                }
+
+            return {
+                "status": "success",
+                "message": (
+                    "Reviewed REAL JMeter plan generated from the trusted "
+                    "workload profile and saved in the job artifact directory."
+                ),
+                "tool": tool,
+                "application": application,
+                "scenario": scenario,
+                "api_name": api_name,
+                "execution_mode": execution_mode,
+                "execution_status": "prepared",
+                "file_name": file_name,
+                "file_path": str(script_path),
+                "artifact_path": file_name,
+            }
+
         if tool != "k6":
             return {
                 "status": "error",
@@ -80,7 +195,7 @@ def generate_script(
             profile = workload_profile_from_test_case(
                 {"workload_profile": workload_profile}
             )
-            expected_directory = resolve_artifact_directory(job_id)
+            expected_directory = resolve_artifact_directory(job_id, tool="k6")
             if artifact_directory is None:
                 raise ValueError("REAL k6 generation requires a job artifact directory.")
             job_directory = Path(artifact_directory).expanduser().resolve()

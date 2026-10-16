@@ -20,9 +20,9 @@ KNOWLEDGE_BASE_DIR=<absolute path>\Analysis_Report_agent_adk\knowledge_base
 
 Add new `.txt`/`.md`/`.pdf` documents to `knowledge_base/` and re-run step 4 to update retrieval content.
 
-## Execution context and REAL-run safety (Phase 1)
+## Execution context and REAL-run safety (Phases 1–5)
 
-Requests to create or run a k6 performance-test script select `REAL`
+Requests to create or run a k6 or JMeter performance-test script select `REAL`
 execution, including API chat requests without a catalog case. A complete
 trusted workload profile and passing safety preflight are still required;
 missing profile values are requested rather than guessed or simulated.
@@ -30,12 +30,42 @@ Supply that profile by loading a trusted catalog case in ADK Web or through
 the API's execution context; free-form workload values are not converted into
 trusted profile data automatically.
 Unless the request explicitly says not to execute, a k6 script request runs
-the test and captures its native report. JMeter and Gatling requests continue
-to use the simulated path.
-After a completed REAL k6 run, the orchestrator runs monitoring, security,
-analysis, and report in that order; the final PDF references the generated
-native report and raw artifacts. If execution is blocked, fails, or needs
-profile input, downstream stages do not consume simulated or stale results.
+the test and captures its native report under
+`src/generated_scripts/k6 native reports/<job_id>/`, alongside its other
+job artifacts. JMeter requests enter REAL-mode
+preflight. After preflight passes, the agent generates a deterministic JMX
+plan from the trusted profile and saves it under
+`src/generated_scripts/Jmeter native reports/<job_id>/`. The plan includes the
+HTTP target,
+method, configured headers and JSON body, users, ramp-up, duration, and a
+shared-thread-group throughput cap. `REAL_JMETER_MAX_RPS` sets the maximum
+accepted JMeter rate (default `1000` requests/second). A generation-only
+request stops after preparing the plan. An explicit JMeter run request also
+executes that plan with the JMeter and Java executables found on `PATH`, in
+non-GUI mode, with a bounded timeout and process-group cleanup. The job
+directory receives the raw JTL results, JMeter log, normalized metrics, and
+runner log. Missing dependencies and runner errors are REAL failures;
+response/status and p95 threshold breaches remain completed REAL outcomes with
+`thresholds_passed: false`. Header values are referenced as JMeter properties
+so secrets are not written into the JMX file or command line. Native HTML
+report generation runs from the JTL with JMeter's dashboard generator. The
+dashboard is stored at
+`src/generated_scripts/Jmeter native reports/<job_id>/jmeter_native_report/`;
+the per-job directory contains the JMX plan, raw JTL, logs, metrics, and
+dashboard ZIP. Open `jmeter_native_report/index.html` to view the dashboard.
+The artifact manifest exposes the dashboard, raw JTL, and ZIP through
+the authenticated `/artifacts/<job_id>/<artifact_key>` API. The final PDF links
+to each item. REAL JMeter runs also create the shared five-second aligned
+time-series files from current-job JTL samples and sample the load-generator
+host with psutil while JMeter is running. CPU and memory are labeled as
+load-generator measurements, not target telemetry. Request/error counts,
+throughput, and latency percentiles flow into analysis from the JTL. Gatling
+requests continue to use the simulated path.
+After a completed REAL k6 or JMeter run, the orchestrator runs monitoring,
+security, analysis, and report in that order. The k6 final PDF can reference
+its native HTML report; JMeter's final PDF links to its native HTML dashboard
+and raw JTL. If execution is blocked, fails, or needs profile input, downstream
+stages do not consume simulated or stale results.
 
 In ADK Web or the chat API, select a catalog case directly in the request,
 for example: `Run test case PTC-012, monitor it, analyze the combined
@@ -44,6 +74,14 @@ to the catalog profile before execution, so do not repeat its workload
 fields in the prompt. Each PTC/WTC entry must exist in the catalog; a request
 with multiple IDs is rejected as ambiguous. In ADK Web, a new explicit case
 can replace a prior job only when that job is not running.
+
+The same performance case ID can be run with either real runner by naming it
+explicitly in the request, for example `Run test case PTC-001 using JMeter`
+or `Run test case PTC-001 using k6`. The requested runner is selected for that
+job; the URL, endpoint, method, payload, load limits, and thresholds continue
+to come from the trusted catalog entry. The selected runner's safety preflight
+is rerun before execution. If no runner is named, the catalog's configured
+tool remains the default. Do not request both runners in one execution.
 
 The workload profile is a typed view of the catalog's execution inputs:
 `tool`, `target_url`, `environment` (`mock_api` or `external_api`), `endpoint`,
@@ -56,8 +94,12 @@ when the approved endpoint does not require credentials. Store credential
 references only; never put secret values in catalog JSON or prompts.
 
 Every REAL workload must provide an explicit positive `max_rps`. The reviewed
-k6 script and runner both enforce that rate ceiling; no unbounded loopback
-load is started when the profile omits it.
+k6 script and runner both enforce that rate ceiling. JMeter's generated plan
+uses a shared-thread-group throughput timer bounded by `REAL_JMETER_MAX_RPS`.
+Header environment variables referenced by `header_env` must be set for the
+agent process; the runner passes them through a temporary private properties
+file and removes it after execution. No REAL workload is started when the
+profile omits its rate limit.
 
 Real-run preflight defaults are intentionally limited to the local mock API:
 
@@ -69,7 +111,9 @@ REAL_EXECUTION_ALLOWED_PORTS=8000
 REAL_EXECUTION_MAX_USERS=500
 REAL_EXECUTION_MAX_DURATION_SECONDS=500
 REAL_EXECUTION_MAX_RAMP_UP_SECONDS=90
-EXECUTION_ARTIFACTS_ROOT=src/generated_scripts/artifacts
+REAL_JMETER_MAX_RPS=1000
+K6_EXECUTION_ARTIFACTS_ROOT="src/generated_scripts/k6 native reports"
+JMETER_EXECUTION_ARTIFACTS_ROOT="src/generated_scripts/Jmeter native reports"
 ```
 
 Unset safety limits use the defaults above; malformed settings block REAL
@@ -83,6 +127,59 @@ to load test. Redirect following is disabled in the generated k6 request so a
 redirect cannot send load to a second host. The runner repeats target
 validation immediately before execution. For production deployments, enforce
 the same destination policy with network egress controls as well.
+
+### JMeter and Java installation, configuration, and native reports
+
+REAL JMeter execution requires Apache JMeter and Java to be installed on the
+machine running the agent, with both `jmeter` and `java` discoverable on
+`PATH`. The generated JMX identifies JMeter 5.6.3. JMeter 5.6.x supports Java
+8 or later; Java 17 or later is recommended by Apache. A JDK is recommended
+when HTTPS certificate recording or Java development tools are needed. See
+the [Apache JMeter installation and requirements guide](https://jmeter.apache.org/usermanual/get-started.html)
+and [official download page](https://jmeter.apache.org/download_jmeter.cgi).
+
+After installation, open a new terminal (or restart the agent process) and
+confirm both commands resolve and print their versions:
+
+```bash
+jmeter --version
+java -version
+```
+
+On macOS or Linux, add the JMeter `bin` directory to `PATH` if `jmeter` is
+not found. Set `JAVA_HOME` to the installed JDK when Java is not automatically
+detected. `JMETER_HOME` may be set to the JMeter installation directory when
+the launcher cannot infer it. Restart FastAPI/ADK after changing these
+environment variables so the agent process sees them. Missing JMeter or Java
+is reported as a failed REAL run; the agent does not switch to simulated
+results.
+
+JMeter safety and workload settings use the same preflight controls as the
+other REAL runner, plus `REAL_JMETER_MAX_RPS` (default `1000`). Configure
+`REAL_EXECUTION_ENABLED=true` to permit REAL workloads. Local mock targets are
+allowed by default only on loopback and port 8000. External targets require
+`REAL_EXECUTION_EXTERNAL_TARGETS_ENABLED=true` and explicit host/port
+allowlisting. `header_env` values name environment variables containing
+secrets; set those variables in the agent process environment and never put
+the secret values in the test catalog. The runner supplies these values via a
+temporary private Java properties file and removes it after execution.
+
+For each k6 job, the generated script, raw results, summary, normalized
+metrics, runtime samples, time-series files, native report, and runner logs
+are stored together under `src/generated_scripts/k6 native reports/<job_id>/`.
+JMeter's JMX plan, raw JTL, logs, metrics, samples, native dashboard, and ZIP
+are stored together under `src/generated_scripts/Jmeter native reports/<job_id>/`.
+Open `jmeter_native_report/index.html` to view JMeter's dashboard. The
+dashboard, raw JTL, and ZIP are listed in the job artifact manifest and are
+downloadable from `/artifacts/<job_id>/native_report`,
+`/artifacts/<job_id>/raw_results`, and
+`/artifacts/<job_id>/native_report_archive`. The final PDF includes links to
+those same artifacts. In the API response, check `report_result.file_path`
+for the PDF location and `execution_artifacts.artifacts` for the native report
+references. The tool-specific roots can be changed with
+`K6_EXECUTION_ARTIFACTS_ROOT` and `JMETER_EXECUTION_ARTIFACTS_ROOT`. Avoid the
+legacy shared `EXECUTION_ARTIFACTS_ROOT` setting when separate tool folders
+are required.
 
 For example, after confirming that `reqres.in` is approved for your test,
 configure:
@@ -119,7 +216,7 @@ Validate and run a prepared local k6 script by setting its `BASE_URL`:
 
 ```bash
 JOB_ID=JOB-0123456789abcdef0123456789abcdef
-SCRIPT_PATH="src/generated_scripts/artifacts/$JOB_ID/k6_PTC_011_Local_Mock_Payment_API_k6_Script_Generation.js"
+SCRIPT_PATH="src/generated_scripts/k6 native reports/$JOB_ID/k6_PTC_011_Local_Mock_Payment_API_k6_Script_Generation.js"
 k6 inspect -e BASE_URL=http://localhost:8000 "$SCRIPT_PATH"
 k6 run -e BASE_URL=http://127.0.0.1:8000 "$SCRIPT_PATH"
 ```
@@ -127,7 +224,7 @@ k6 run -e BASE_URL=http://127.0.0.1:8000 "$SCRIPT_PATH"
 Replace the example `JOB_ID` with the prepared run's job ID.
 
 Each request receives a generated `JOB-<uuid>` and a planned directory under
-`src/generated_scripts/artifacts/<job_id>/`. Phase 1 defines the job status
+`src/generated_scripts/k6 native reports/<job_id>/`. Phase 1 defines the job status
 and artifact-manifest contract. REAL k6 scripts are named from the test-case
 ID and title (or the requested scenario when no catalog title is available).
 An explicit run request validates the reviewed script, executes k6, and
@@ -159,8 +256,10 @@ For REAL k6 requests, the Test Execution Agent verifies the script still
 matches the deterministic template, runs `k6 inspect`, and executes k6
 with the profile's `max_rps`. A completed execution stores raw JSON samples,
 the native k6 JSON summary, normalized 13-field metrics, a five-second CSV
-time series, the self-contained native HTML dashboard report, and runner
-logs. A k6 threshold breach is a completed run with failing metrics; tool,
+time series, runner logs, and the native HTML dashboard in the per-job
+directory under `src/generated_scripts/k6 native reports/<job_id>/`. The
+artifact manifest and final PDF link directly to those job-local files.
+A k6 threshold breach is a completed run with failing metrics; tool,
 script, timeout, or artifact-generation failures are execution errors.
 Explicit no-execution requests stop after preparing the titled script.
 
@@ -326,7 +425,7 @@ directory. REAL reports include measured latency, throughput, and
 load-generator CPU charts, with API links to the native HTML dashboard, raw
 k6 results, and their ZIP package. The generated script, raw/normalized
 results, monitoring samples, time series, native report, and consolidated
-PDF are in `src/generated_scripts/artifacts/<job_id>/`.
+PDF are in `src/generated_scripts/k6 native reports/<job_id>/`.
 
 For a generation-only check, select PTC-011 and ask:
 

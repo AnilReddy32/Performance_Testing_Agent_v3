@@ -24,7 +24,7 @@ _SAMPLE_FIELDS = (
 
 
 class RuntimeMetricsSampler:
-    """Collect host-wide CPU and memory while k6 is running.
+    """Collect host-wide CPU and memory while a load generator is running.
 
     These are measurements of the host running the load generator, not
     target-application resource metrics.

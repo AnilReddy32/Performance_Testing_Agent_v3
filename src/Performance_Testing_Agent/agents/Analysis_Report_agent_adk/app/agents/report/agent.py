@@ -34,7 +34,7 @@ test_case_prompt, data_quality_status, unusable_reason, overall_status,
 api_findings, infra_health, security_summary, time_series_analysis,
 execution_mode, execution_profile, execution_artifact_directory,
 execution_artifacts, summary, and
-ready_for_report.
+ready_for_report, execution_status, and execution_outcome.
 
 Follow this exact sequence:
 
@@ -42,7 +42,8 @@ Follow this exact sequence:
    {analysis_result} (job_id, application, scenario, data_quality_status,
    unusable_reason, overall_status, api_findings, infra_health,
    security_summary, time_series_analysis, summary, test_case_prompt, execution_mode,
-   execution_profile, execution_artifact_directory, execution_artifacts),
+   execution_profile, execution_artifact_directory, execution_artifacts,
+   execution_status, execution_outcome),
    plus requested_format (the same value you'll pass to finalize_report in
    step 2 - default "pdf" unless the user/orchestrator specified otherwise). Pass
    infra_health/security_summary as None if they're absent from
@@ -50,18 +51,22 @@ Follow this exact sequence:
    invoke Monitoring/Security for this job, not an error. Pass
    test_case_prompt through UNCHANGED if present (omit/None if absent) --
    never invent or paraphrase it.
-   - If data_quality_status is "invalid" / ready_for_report is false, the
-     tool will produce a short rejection section explaining why -- do not
-     try to write a full performance report in that case.
+   - For a terminal REAL run (execution_status completed or failed), always
+     produce the PDF even when data_quality_status is invalid or metrics are
+     unavailable. Include the execution outcome and any monitoring/security
+     inputs preserved in execution_outcome, and state the data limitation;
+     never invent measurements. For other invalid analyses, retain the existing
+     short rejection behavior.
    Include execution_mode, execution_profile,
    execution_artifact_directory, and execution_artifacts from
    {analysis_result} unchanged. These were collected from the trusted
    execution session state and are rendered in the Execution Profile and
    Artifacts section; do not infer, rewrite, or invent them. For REAL runs
    with both native_report and raw_results in the manifest, that tool
-   packages those files into a job-scoped ZIP and adds links for the native
-   HTML, raw JSON, and ZIP to the section. The interactive HTML dashboard
-   must remain a separate linked artifact, not embedded in the PDF.
+   preserves the runner's dashboard/JTL package when present (or packages
+   the available files) and adds links for the native HTML, raw results, and
+   ZIP to the section. The interactive HTML dashboard must remain a separate
+   linked artifact, not embedded in the PDF.
    Pass time_series_analysis unchanged so the tool can render the measured
    REAL latency, throughput, and available load-generator CPU charts.
 

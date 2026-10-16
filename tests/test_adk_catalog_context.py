@@ -129,6 +129,44 @@ class TestAdkCatalogContext(unittest.TestCase):
         self.assertEqual(state["execution_mode"], "REAL")
         self.assertEqual(state["execution_preflight"]["status"], "ready")
 
+    def test_same_catalog_id_can_select_both_real_runners(self):
+        state = {}
+        callback_context = type(
+            "CallbackContextStub",
+            (),
+            {
+                "state": state,
+                "user_content": type(
+                    "ContentStub",
+                    (),
+                    {
+                        "parts": [
+                            type(
+                                "PartStub",
+                                (),
+                                {"text": "Run test case PTC-012 using JMeter"},
+                            )()
+                        ]
+                    },
+                )(),
+            },
+        )()
+
+        bind_explicit_catalog_case(callback_context)
+        self.assertEqual(state["test_case_id"], "PTC-012")
+        self.assertEqual(state["workload_profile"]["tool"], "jmeter")
+        self.assertEqual(state["execution_mode"], "REAL")
+        self.assertEqual(state["execution_preflight"]["status"], "ready")
+
+        callback_context.user_content.parts[0].text = (
+            "Run test case PTC-012 using k6"
+        )
+        bind_explicit_catalog_case(callback_context)
+        self.assertEqual(state["test_case_id"], "PTC-012")
+        self.assertEqual(state["workload_profile"]["tool"], "k6")
+        self.assertEqual(state["execution_mode"], "REAL")
+        self.assertEqual(state["execution_preflight"]["status"], "ready")
+
     def test_unknown_catalog_id_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "Unknown test case ID"):
             load_catalog_test_case(

@@ -1,4 +1,4 @@
-"""Deterministic completion for terminal REAL k6 orchestration runs."""
+"""Deterministic completion for terminal REAL performance-test runs."""
 
 import json
 import re
@@ -44,22 +44,28 @@ async def complete_real_k6_pipeline(
     analysis_agent: Any,
     report_agent: Any,
     agents_called: list[str] | None = None,
+    persist_state: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
 ) -> dict[str, str] | None:
-    """Fill missing downstream stages for terminal REAL k6 jobs only.
+    """Fill missing downstream stages for terminal REAL k6 and JMeter jobs.
 
     The supplied invoker determines the ADK entry point, while this function
     owns common gating, job checks, and idempotent stage sequencing. It never
-    starts or repeats k6 execution.
+    starts or repeats the load test.
     """
     profile = state.get("workload_profile")
+    tool = profile.get("tool") if isinstance(profile, dict) else None
     execution_status = state.get("execution_status")
     if (
         state.get("execution_mode") != "REAL"
         or not isinstance(profile, dict)
-        or profile.get("tool") != "k6"
+        or tool not in {"k6", "jmeter"}
         or execution_status not in {"completed", "failed", "blocked", "needs_input"}
     ):
         return None
+
+    pipeline_state_key = (
+        "real_jmeter_pipeline" if tool == "jmeter" else "real_k6_pipeline"
+    )
 
     job_id = state.get("job_id")
     if not isinstance(job_id, str) or not job_id:
@@ -76,9 +82,17 @@ async def complete_real_k6_pipeline(
         current_job_required: bool = True,
     ) -> None:
         existing = json_object(state.get(result_key))
-        if existing is not None and (
+        existing_is_current = existing is not None and (
             not current_job_required or existing.get("job_id") == job_id
-        ):
+        )
+        if result_key == "report_result":
+            existing_is_current = bool(
+                existing_is_current and isinstance(existing.get("file_path"), str)
+                and existing["file_path"].strip()
+                and existing.get("report_format") in {"pdf", "both"}
+                and existing.get("rejected") is False
+            )
+        if existing_is_current:
             state[result_key] = existing
             pipeline[stage] = "already_available"
             return
@@ -96,14 +110,14 @@ async def complete_real_k6_pipeline(
             else:
                 pipeline[stage] = "missing_result"
         except Exception as exc:  # keep later independent stages available
-            logger.exception("REAL k6 pipeline stage %s failed", stage)
+            logger.exception("REAL performance pipeline stage %s failed", stage)
             pipeline[stage] = f"failed: {type(exc).__name__}: {exc}"
 
     if execution_status == "completed":
         await invoke_if_missing(
             "monitoring",
             monitoring_agent,
-            "Monitor the completed REAL k6 execution for this job. "
+            f"Monitor the completed REAL {tool} execution for this job. "
             "Use only its current job-scoped REAL monitoring samples; "
             "do not substitute simulated values.",
             "monitoring_result",
@@ -127,21 +141,201 @@ async def complete_real_k6_pipeline(
     else:
         pipeline["security"] = "skipped: not requested"
 
+    execution_stage = json_object(state.get("execution_stage_result")) or {}
+    execution_artifacts = state.get("execution_artifacts")
+    artifact_values = (
+        execution_artifacts.get("artifacts", {})
+        if isinstance(execution_artifacts, dict)
+        and execution_artifacts.get("job_id") == job_id
+        else {}
+    )
+    analysis_inputs = {
+        "job_id": job_id,
+        "execution_mode": "REAL",
+        "execution_status": execution_status,
+        "execution_stage_result": execution_stage,
+        "test_execution_result": (
+            state.get("test_execution_result")
+            if isinstance(state.get("test_execution_result"), dict)
+            and state["test_execution_result"].get("job_id") == job_id
+            else None
+        ),
+        "monitoring_result": (
+            state.get("monitoring_result")
+            if isinstance(state.get("monitoring_result"), dict)
+            and state["monitoring_result"].get("job_id") == job_id
+            else None
+        ),
+        "security_result": (
+            state.get("security_result")
+            if isinstance(state.get("security_result"), dict)
+            and state["security_result"].get("job_id") in (None, job_id)
+            else None
+        ),
+        "execution_artifacts": artifact_values,
+    }
     await invoke_if_missing(
         "analysis",
         analysis_agent,
         "Analyze the current job using its current test_execution_result, "
-        "monitoring_result, and any explicitly requested security_result. "
-        "Do not use results from another job. Follow your required tool "
-        "sequence and return the structured analysis.",
+        "monitoring_result, execution_stage_result, and any explicitly "
+        "requested security_result shown below. Use only evidence for this "
+        "job. If execution failed or metrics are absent, preserve the failure "
+        "as unavailable/invalid data and do not invent measurements. Follow "
+        "your tool sequence and return structured analysis. Current-job "
+        "inputs: " + json.dumps(analysis_inputs, separators=(",", ":"), default=str),
         "analysis_result",
     )
 
     analysis = json_object(state.get("analysis_result"))
-    if analysis is None or analysis.get("job_id") != job_id:
-        pipeline["report"] = "skipped: current-job analysis is unavailable"
-        state["real_k6_pipeline"] = pipeline
-        return pipeline
+    analysis_is_current = analysis is not None and analysis.get("job_id") == job_id
+    if not analysis_is_current:
+        pipeline["analysis"] = pipeline.get(
+            "analysis", "missing_result: current-job analysis is unavailable"
+        )
+        analysis = None
+
+    terminal_analysis_unusable = (
+        analysis is None
+        or analysis.get("ready_for_report") is False
+        or analysis.get("data_quality_status") == "invalid"
+    )
+    stage_status = str(execution_stage.get("status") or execution_status)
+    execution_message = execution_stage.get("message")
+    if not isinstance(execution_message, str) or not execution_message.strip():
+        execution_message = (
+            "The REAL execution failed before usable metrics were available."
+            if execution_status == "failed"
+            else "The REAL execution completed."
+        )
+    outcome: dict[str, Any] = {
+        "job_id": job_id,
+        "execution_mode": "REAL",
+        "execution_status": execution_status,
+        "runner_status": stage_status,
+        "message": execution_message,
+    }
+    for field in ("exit_code", "thresholds_passed", "threshold_failures", "blocked_reasons"):
+        if field in execution_stage:
+            outcome[field] = execution_stage[field]
+    for key in ("monitoring_result", "security_result"):
+        current_result = json_object(analysis_inputs.get(key))
+        if current_result is not None:
+            outcome[key] = current_result
+
+    workload_profile = state.get("workload_profile")
+    safe_profile_fields = (
+        "tool", "target_url", "endpoint", "method", "users", "max_rps",
+        "duration_seconds", "ramp_up_seconds", "expected_status_code",
+        "p95_threshold_ms",
+    )
+    safe_profile = (
+        {
+            key: workload_profile[key]
+            for key in safe_profile_fields
+            if workload_profile.get(key) is not None
+        }
+        if isinstance(workload_profile, dict)
+        else {}
+    )
+
+    if terminal_analysis_unusable or execution_status == "failed":
+        failure_message = execution_message
+        if execution_status != "failed" and terminal_analysis_unusable:
+            failure_message = (
+                analysis.get("unusable_reason")
+                if isinstance(analysis, dict)
+                else "Analysis did not return a current-job result."
+            )
+            outcome["message"] = failure_message
+
+        app_name = (
+            str((state.get("workload_profile") or {}).get("application") or "Unknown")
+            if isinstance(state.get("workload_profile"), dict)
+            else "Unknown"
+        )
+        scenario = str(
+            state.get("test_case_name")
+            or (state.get("workload_profile") or {}).get("scenario")
+            or "Performance Test"
+        )
+        report_context = (
+            analysis.get("time_series_analysis")
+            if isinstance(analysis, dict)
+            and isinstance(analysis.get("time_series_analysis"), dict)
+            else {}
+        )
+        artifacts = (
+            artifact_values
+            if isinstance(artifact_values, dict)
+            else {}
+        )
+        if isinstance(report_context, dict):
+            report_context.setdefault("execution_artifacts", artifacts)
+        summary = (
+            f"REAL {tool} execution status: {execution_status}. {failure_message} "
+            "No performance conclusion is drawn from metrics that were unavailable."
+        )
+        if execution_status == "completed" and terminal_analysis_unusable:
+            summary = (
+                f"REAL {tool} execution completed, but the available results could "
+                f"not be validated for analysis: {failure_message}"
+            )
+        analysis = {
+            **(analysis or {}),
+            "job_id": job_id,
+            "application": str((analysis or {}).get("application") or app_name),
+            "scenario": str((analysis or {}).get("scenario") or scenario),
+            "test_case_prompt": (analysis or {}).get("test_case_prompt") or user_query,
+            "data_quality_status": (analysis or {}).get("data_quality_status") or "invalid",
+            "unusable_reason": (analysis or {}).get("unusable_reason") or failure_message,
+            "overall_status": "fail" if execution_status == "failed" else "warning",
+            "api_findings": (analysis or {}).get("api_findings") or [],
+            "infra_health": (analysis or {}).get("infra_health"),
+            "security_summary": (analysis or {}).get("security_summary"),
+            "time_series_analysis": report_context,
+            "execution_mode": "REAL",
+            "execution_status": execution_status,
+            "execution_outcome": outcome,
+            "execution_profile": (analysis or {}).get("execution_profile") or safe_profile,
+            "execution_artifact_directory": (
+                (analysis or {}).get("execution_artifact_directory")
+                or state.get("execution_artifact_directory")
+            ),
+            "execution_artifacts": {
+                **(
+                    (analysis or {}).get("execution_artifacts")
+                    if isinstance((analysis or {}).get("execution_artifacts"), dict)
+                    else {}
+                ),
+                **artifacts,
+            },
+            "summary": (
+                summary
+                if execution_status == "failed"
+                else (analysis or {}).get("summary") or summary
+            ),
+            "ready_for_report": True,
+        }
+        pipeline["analysis"] = pipeline.get("analysis", "completed") + "; made terminal outcome reportable"
+
+    if analysis is not None and execution_status in {"completed", "failed"}:
+        analysis["execution_mode"] = "REAL"
+        analysis["execution_status"] = execution_status
+        analysis["execution_outcome"] = outcome
+        analysis["execution_profile"] = safe_profile
+        analysis["execution_artifact_directory"] = (
+            state.get("execution_artifact_directory")
+            or analysis.get("execution_artifact_directory")
+        )
+        existing_analysis_artifacts = analysis.get("execution_artifacts")
+        analysis["execution_artifacts"] = {
+            **(existing_analysis_artifacts if isinstance(existing_analysis_artifacts, dict) else {}),
+            **(artifact_values if isinstance(artifact_values, dict) else {}),
+        }
+        state["analysis_result"] = analysis
+        if persist_state is not None:
+            await persist_state({"analysis_result": analysis})
 
     await invoke_if_missing(
         "report",
@@ -152,5 +346,5 @@ async def complete_real_k6_pipeline(
         "report_result",
     )
 
-    state["real_k6_pipeline"] = pipeline
+    state[pipeline_state_key] = pipeline
     return pipeline

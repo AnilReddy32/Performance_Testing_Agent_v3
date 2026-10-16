@@ -72,7 +72,7 @@ def _read_execution_buckets(
             timestamp = _parse_timestamp(row["timestamp"], "Execution time series")
             elapsed = (timestamp - run_started_at).total_seconds()
             if elapsed < 0:
-                raise ValueError("Execution sample precedes the k6 run start.")
+                raise ValueError("Execution sample precedes the run start.")
             bucket_index = int(elapsed // TIME_SERIES_BUCKET_SECONDS)
             requests = int(_finite_number(row["requests"], "requests", "Execution time series"))
             successful = int(
@@ -89,10 +89,14 @@ def _read_execution_buckets(
                     "Execution time series",
                 )
             )
-            average_latency = _finite_number(
-                row["avg_response_time_ms"],
-                "avg_response_time_ms",
-                "Execution time series",
+            average_latency: float | str = (
+                ""
+                if row.get("avg_response_time_ms", "") == ""
+                else _finite_number(
+                    row["avg_response_time_ms"],
+                    "avg_response_time_ms",
+                    "Execution time series",
+                )
             )
             throughput = _finite_number(
                 row["throughput_rps"],
@@ -102,7 +106,7 @@ def _read_execution_buckets(
             if (
                 min(requests, successful, failed) < 0
                 or successful + failed != requests
-                or average_latency < 0
+                or (average_latency != "" and average_latency < 0)
                 or throughput < 0
             ):
                 raise ValueError("Execution time series contains inconsistent metrics.")
@@ -184,21 +188,24 @@ def write_aligned_time_series(
     output_path: Path,
     run_started_at: datetime,
     run_finished_at: datetime,
+    execution_data_source: str = "k6",
 ) -> int:
     """Write one fixed-width elapsed-time grid with explicit per-source scope.
 
-    UTC timestamps are converted to offsets from k6 start, then floored into
+    UTC timestamps are converted to offsets from the execution start, then floored into
     half-open five-second windows [start, end). Missing execution counts are
     zero; latency and monitoring fields remain empty when no observation
     exists. The final window is shortened to the actual run end.
     """
     if run_started_at.tzinfo is None or run_finished_at.tzinfo is None:
         raise ValueError("Time-series alignment requires timezone-aware run times.")
+    if execution_data_source not in {"k6", "jmeter"}:
+        raise ValueError("Unsupported REAL execution time-series source.")
     start = run_started_at.astimezone(timezone.utc)
     finish = run_finished_at.astimezone(timezone.utc)
     duration_seconds = (finish - start).total_seconds()
     if duration_seconds <= 0:
-        raise ValueError("The k6 run window must have positive duration.")
+        raise ValueError("The REAL execution run window must have positive duration.")
 
     execution_buckets = _read_execution_buckets(execution_time_series_path, start)
     monitoring_buckets = _read_monitoring_buckets(
@@ -254,7 +261,7 @@ def write_aligned_time_series(
                         "memory_peak_percent",
                         "",
                     ),
-                    "execution_data_source": "k6",
+                    "execution_data_source": execution_data_source,
                     "execution_measurement_scope": (
                         "load_generator_observed_http_traffic"
                     ),

@@ -390,6 +390,7 @@ def run_real_k6_test(
     """Validate and run the prepared deterministic k6 script."""
     artifacts: dict[str, str] = {}
     artifact_paths: dict[str, Path] = {}
+    report_path: Path | None = None
     try:
         profile = WorkloadProfile.model_validate(profile_data)
         preflight = validate_real_profile(profile)
@@ -409,7 +410,7 @@ def run_real_k6_test(
                 "only for an unauthenticated target."
             )
         assert profile.max_rps is not None
-        job_directory = resolve_artifact_directory(job_id)
+        job_directory = resolve_artifact_directory(job_id, tool="k6")
         supplied_directory = Path(artifact_directory).expanduser().resolve()
         if supplied_directory != job_directory:
             raise ValueError(
@@ -442,6 +443,12 @@ def run_real_k6_test(
             resolved_script,
             "native_report.html",
         )
+        if report_path.is_symlink():
+            raise ValueError("Existing k6 native report cannot be a symbolic link.")
+        if report_path.exists():
+            if not report_path.is_file():
+                raise ValueError("Existing k6 native report path is not a file.")
+            report_path.unlink()
         time_series_path = job_directory / _artifact_name(
             resolved_script,
             "time_series.csv",
@@ -602,6 +609,8 @@ def run_real_k6_test(
             )
         if not report_path.is_file() or report_path.stat().st_size == 0:
             raise RuntimeError("k6 did not produce its native HTML report.")
+
+        artifacts["native_report"] = report_path.name
 
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         metrics = _normalized_metrics(

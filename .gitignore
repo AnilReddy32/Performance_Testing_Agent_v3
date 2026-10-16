@@ -6,10 +6,7 @@ dist/
 wheels/
 *.egg-info/
 src/data/
-**/generated_scripts/
 **/generated_data/
-**/generated_reports/
-
 # Virtual environments
 .venv/
 venv/

@@ -1,0 +1,15 @@
+timestamp,elapsed_seconds,bucket_duration_seconds,requests,successful_requests,failed_requests,avg_response_time_ms,throughput_rps,cpu_avg_percent,cpu_peak_percent,memory_avg_percent,memory_peak_percent,execution_data_source,execution_measurement_scope,monitoring_data_source,monitoring_measurement_scope,target_resource_metrics
+2026-10-16T12:17:13.120796+00:00,0,5,53,53,0,208.39035849056611,10.6,17.375,32.3,80.475,81.3,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:18.120796+00:00,5,5,60,60,0,276.2860666666667,12.0,11.120000000000001,18.8,79.26,79.7,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:23.120796+00:00,10,5,58,58,0,218.06429310344822,11.6,9.74,12.7,79.1,79.4,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:28.120796+00:00,15,5,62,62,0,256.8259677419355,12.4,9.74,11.5,79.02000000000001,79.1,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:33.120796+00:00,20,5,59,59,0,256.4732881355932,11.8,9.059999999999999,10.1,78.96000000000001,79.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:38.120796+00:00,25,5,61,61,0,264.6215901639345,12.2,8.959999999999999,9.6,78.97999999999999,79.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:43.120796+00:00,30,5,59,58,1,220.65649152542377,11.8,9.2,9.9,78.96000000000001,79.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:48.120796+00:00,35,5,60,59,1,217.64361666666676,12.0,9.5,10.6,78.78,78.8,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:53.120796+00:00,40,5,61,61,0,240.85321311475408,12.2,9.459999999999999,10.5,78.86,78.9,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:17:58.120796+00:00,45,5,58,58,0,235.541275862069,11.6,9.28,11.1,78.74,78.8,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:18:03.120796+00:00,50,5,63,63,0,241.32465079365087,12.6,9.040000000000001,10.1,78.7,78.7,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:18:08.120796+00:00,55,5,59,59,0,228.1619152542373,11.8,9.0,9.3,78.7,78.7,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:18:13.120796+00:00,60,5,4,3,1,324.13750000000005,0.8,8.4,8.5,78.72,78.8,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-16T12:18:18.120796+00:00,65,1.447411,1,0,1,0.0,0.6908887662177502,8.95,9.3,78.65,78.7,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
