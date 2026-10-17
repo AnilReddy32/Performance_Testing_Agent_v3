@@ -1,0 +1,42 @@
+{
+  "job_id": "JOB-2ccb7d63a3df433d8ba4673e35a5c9b9",
+  "jmeter_run_window": {
+    "started_at": "2026-10-17T07:11:27.089128+00:00",
+    "finished_at": "2026-10-17T07:12:46.071072+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "alignment_origin": "jmeter_run_window.started_at",
+    "alignment_rule": "UTC timestamps converted to elapsed offsets from JMeter start, then floored into half-open five-second windows."
+  },
+  "sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 78,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T07:11:27.088985+00:00",
+      "sampler_stopped_at": "2026-10-17T07:12:46.071077+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "sampling_error": null
+    },
+    "jmeter_time_series": {
+      "data_source": "JMeter raw JTL sample rows",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  }
+}

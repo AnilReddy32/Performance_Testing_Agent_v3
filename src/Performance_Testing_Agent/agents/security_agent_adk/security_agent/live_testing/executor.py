@@ -9,6 +9,7 @@ from security_agent.live_testing.models import (
     HTTPResponse,
     LiveTestPolicy,
 )
+from security_agent.live_testing.safety import SAFE_METHODS
 
 
 class HTTPExecutor:
@@ -29,6 +30,22 @@ class HTTPExecutor:
         """Execute one controlled HTTP request."""
 
         method = request.method.upper()
+
+        if method not in SAFE_METHODS:
+            return HTTPExecutionResult(
+                success=False,
+                error="Only non-state-changing HEAD, GET, and OPTIONS methods are permitted.",
+            )
+        if request.body is not None:
+            return HTTPExecutionResult(
+                success=False,
+                error="Request bodies are not permitted for live security checks.",
+            )
+        if request.headers:
+            return HTTPExecutionResult(
+                success=False,
+                error="Caller-supplied request headers are not permitted for live security checks.",
+            )
 
         parsed_url = urlparse(request.url)
 
@@ -58,32 +75,27 @@ class HTTPExecutor:
                 follow_redirects=False,
                 trust_env=False,
             ) as client:
-                response = await client.request(
-                    method=method,
-                    url=request.url,
-                    headers=request.headers,
-                    content=request.body,
-                )
-
-                content = await response.aread()
+                async with client.stream(method=method, url=request.url) as response:
+                    content = bytearray()
+                    async for chunk in response.aiter_bytes():
+                        if len(content) + len(chunk) > self.policy.max_response_bytes:
+                            return HTTPExecutionResult(
+                                success=False,
+                                error=(
+                                    "HTTP response exceeded the configured maximum "
+                                    f"response size of {self.policy.max_response_bytes} bytes."
+                                ),
+                            )
+                        content.extend(chunk)
 
             elapsed_ms = (perf_counter() - start) * 1000
-
-            if len(content) > self.policy.max_response_bytes:
-                return HTTPExecutionResult(
-                    success=False,
-                    error=(
-                        "HTTP response exceeded the configured maximum "
-                        f"response size of {self.policy.max_response_bytes} bytes."
-                    ),
-                )
 
             return HTTPExecutionResult(
                 success=True,
                 response=HTTPResponse(
                     status_code=response.status_code,
                     headers=dict(response.headers),
-                    body=content.decode(
+                    body=bytes(content).decode(
                         response.encoding or "utf-8",
                         errors="replace",
                     ),

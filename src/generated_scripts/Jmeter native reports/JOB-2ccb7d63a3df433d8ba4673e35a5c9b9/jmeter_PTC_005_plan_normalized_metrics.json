@@ -1,0 +1,82 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": true,
+  "threshold_failures": [],
+  "runner": {
+    "name": "Apache JMeter",
+    "executable": "/opt/homebrew/bin/jmeter",
+    "java_executable": "/opt/homebrew/bin/java",
+    "exit_code": 0,
+    "timeout_seconds": 180,
+    "started_at": "2026-10-17T07:11:27.089128+00:00",
+    "finished_at": "2026-10-17T07:12:46.071072+00:00"
+  },
+  "workload_profile": {
+    "users": 25,
+    "max_rps": 15,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "latency_percentiles_ms": {
+    "p50": 397.0,
+    "p90": 1971.0,
+    "p95": 2831.0,
+    "p99": 6371.0
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 78,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T07:11:27.088985+00:00",
+      "sampler_stopped_at": "2026-10-17T07:12:46.071077+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "sampling_error": null
+    },
+    "jmeter_time_series": {
+      "data_source": "JMeter raw JTL sample rows",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "jmeter_run_window": {
+    "started_at": "2026-10-17T07:11:27.089128+00:00",
+    "finished_at": "2026-10-17T07:12:46.071072+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 16,
+    "source_bucket_count": 16,
+    "alignment_origin": "jmeter_run_window.started_at",
+    "artifact": "jmeter_PTC_005_plan_aligned_time_series.csv"
+  },
+  "metrics": {
+    "total_requests": 889,
+    "successful_requests": 889,
+    "failed_requests": 0,
+    "avg_response_time": 977.1687289088864,
+    "p95_response_time": 2831.0,
+    "max_response_time": 38029.0,
+    "error_rate": 0.0,
+    "http_status": 200,
+    "job_id": "JOB-2ccb7d63a3df433d8ba4673e35a5c9b9",
+    "application": "Unknown",
+    "scenario": "Task Status API \u2014 Load Check",
+    "api_name": "/todos/1",
+    "throughput": 11.255778088073432
+  }
+}

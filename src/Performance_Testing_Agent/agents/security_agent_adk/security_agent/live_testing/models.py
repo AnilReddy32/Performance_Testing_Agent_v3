@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -16,11 +16,8 @@ class LiveTestTarget(BaseModel):
         min_length=1,
         description="API endpoint path to test.",
     )
-    method: str = Field(
-        ...,
-        min_length=1,
-        description="HTTP method to use for the test.",
-    )
+    method: str = Field(..., min_length=1)
+    environment: str | None = None
 
 
 class LiveTestScope(BaseModel):
@@ -38,6 +35,10 @@ class LiveTestScope(BaseModel):
         default_factory=list,
         description="Optional paths explicitly authorized for live testing.",
     )
+    allowed_ports: list[int] = Field(
+        default_factory=list,
+        description="Explicitly authorized TCP ports.",
+    )
     environment: str = Field(
         ...,
         min_length=1,
@@ -49,28 +50,25 @@ class LiveTestPolicy(BaseModel):
     """Safety limits applied to live security tests."""
 
     max_requests: int = Field(
-        default=20,
-        gt=0,
+        default=1,
+        ge=1,
+        le=10,
         description="Maximum number of requests permitted for a test.",
     )
     timeout_seconds: int = Field(
-        default=10,
-        gt=0,
+        default=5,
+        ge=1,
+        le=5,
         description="Maximum timeout for an individual request.",
     )
     max_response_bytes: int = Field(
-        default=1_000_000,
-        gt=0,
+        default=8_192,
+        ge=1,
+        le=8_192,
         description="Maximum response body size accepted by the executor.",
     )
-    allow_state_changing_requests: bool = Field(
-        default=False,
-        description="Whether state-changing HTTP requests are permitted.",
-    )
-    allow_destructive_tests: bool = Field(
-        default=False,
-        description="Whether destructive security tests are permitted.",
-    )
+    allow_state_changing_requests: Literal[False] = False
+    allow_destructive_tests: Literal[False] = False
 
 
 class LiveTestResult(BaseModel):

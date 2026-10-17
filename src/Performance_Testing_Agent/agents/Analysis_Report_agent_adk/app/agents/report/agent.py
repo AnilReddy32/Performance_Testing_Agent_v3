@@ -57,6 +57,11 @@ Follow this exact sequence:
      inputs preserved in execution_outcome, and state the data limitation;
      never invent measurements. For other invalid analyses, retain the existing
      short rejection behavior.
+   - Pass security_summary unchanged. The Security Findings section must
+     preserve control coverage, evidence references/provenance, limitations,
+     and any live observation. Display the live-check status as exactly one of
+     completed, failed, not requested, or not assessed; never relabel blocked
+     or missing results as "not run".
    Include execution_mode, execution_profile,
    execution_artifact_directory, and execution_artifacts from
    {analysis_result} unchanged. These were collected from the trusted

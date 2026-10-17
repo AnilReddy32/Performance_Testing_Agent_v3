@@ -1,6 +1,9 @@
 from security_agent.models.assessment import SecurityAssessment
 from security_agent.models.response import SecurityStatus
-from security_agent.security.scoring import calculate_security_score
+from security_agent.security.scoring import (
+    calculate_control_result_score,
+    calculate_security_score,
+)
 
 
 def make_assessment(
@@ -63,22 +66,22 @@ def test_multiple_assessments_are_averaged():
     assert calculate_security_score(assessments) == "66.67%"
 
 
-def test_warning_returns_na():
+def test_warning_with_numeric_score_is_included():
     assessments = [
         make_assessment("JWT", SecurityStatus.PASS, "100%"),
-        make_assessment("OAuth", SecurityStatus.WARNING, "N/A"),
+        make_assessment("OAuth", SecurityStatus.WARNING, "50%"),
     ]
 
-    assert calculate_security_score(assessments) == "N/A"
+    assert calculate_security_score(assessments) == "75%"
 
 
-def test_na_score_returns_na():
+def test_na_score_is_excluded_when_another_numeric_score_exists():
     assessments = [
         make_assessment("JWT", SecurityStatus.PASS, "100%"),
         make_assessment("OAuth", SecurityStatus.PASS, "N/A"),
     ]
 
-    assert calculate_security_score(assessments) == "N/A"
+    assert calculate_security_score(assessments) == "100%"
 
 
 def test_invalid_score_format_returns_na():
@@ -95,3 +98,37 @@ def test_score_outside_valid_range_returns_na():
     ]
 
     assert calculate_security_score(assessments) == "N/A"
+
+
+def test_control_result_score_includes_warning_and_excludes_unassessed():
+    score, basis = calculate_control_result_score([
+        {
+            "control": "rate_limiting",
+            "assessment_status": "assessed",
+            "status": "WARNING",
+            "security_score": "60%",
+            "security_score_basis": "Validator-provided configuration score.",
+        },
+        {
+            "control": "oauth",
+            "assessment_status": "not_assessed",
+            "status": "WARNING",
+            "security_score": "N/A",
+        },
+    ])
+
+    assert score == "60%"
+    assert "overall status is reported separately" in basis
+
+
+def test_control_result_score_is_na_without_numeric_assessed_results():
+    score, basis = calculate_control_result_score([
+        {
+            "control": "oauth",
+            "assessment_status": "not_assessed",
+            "security_score": "N/A",
+        }
+    ])
+
+    assert score == "N/A"
+    assert "No assessed control" in basis

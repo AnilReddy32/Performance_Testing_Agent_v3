@@ -1,0 +1,45 @@
+{
+  "job_id": "JOB-f73918a6c8ae4878b029d2bb5acae5a8",
+  "k6_run_window": {
+    "started_at": "2026-10-17T06:39:07.571276+00:00",
+    "finished_at": "2026-10-17T06:40:07.862743+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "alignment_origin": "k6_run_window.started_at",
+    "alignment_rule": "Timestamp each source in UTC, compute elapsed time from k6 start, then floor into half-open five-second windows."
+  },
+  "sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 60,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T06:39:07.571157+00:00",
+      "sampler_stopped_at": "2026-10-17T06:40:07.862756+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "not_collected": {
+        "database_connections": "No target-specific database telemetry provider is configured."
+      },
+      "sampling_error": null
+    },
+    "k6_time_series": {
+      "data_source": "k6 raw JSON point samples",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  }
+}

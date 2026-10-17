@@ -1,6 +1,7 @@
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, Field
 from security_agent.models.response import SecurityStatus
+from security_agent.models.request import SecurityAssessmentRequest
 
 
 class SecurityEvidence(BaseModel):
@@ -34,6 +35,11 @@ class SecurityAssessment(BaseModel):
         description="Assessment result.",
     )
 
+    severity: Literal["critical", "high", "medium", "low", "unknown"] = Field(
+        default="unknown",
+        description="Validator-provided severity, or unknown if it did not provide one.",
+    )
+
     security_score: str = Field(
         ...,
         description="Validator-provided security score.",
@@ -63,6 +69,11 @@ class AssessmentState(BaseModel):
     objective: str = Field(
         ...,
         description="Original security assessment objective.",
+    )
+
+    request_context: SecurityAssessmentRequest | None = Field(
+        default=None,
+        description="Structured, trusted context for the assessed job and target.",
     )
 
     evidence: list[SecurityEvidence] = Field(

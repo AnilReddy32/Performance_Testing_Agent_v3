@@ -1,0 +1,55 @@
+===== Java executable =====
+/opt/homebrew/bin/java
+
+===== Java version check =====
+openjdk version "17.0.20.1" 2026-08-18
+OpenJDK Runtime Environment Homebrew (build 17.0.20.1+0)
+OpenJDK 64-Bit Server VM Homebrew (build 17.0.20.1+0, mixed mode, sharing)
+
+===== Resolved JMeter executable =====
+/opt/homebrew/bin/jmeter
+
+===== JMeter command =====
+/opt/homebrew/bin/jmeter -n -f -t '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/jmeter_PTC_007_plan.jmx' -l '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/jmeter_PTC_007_plan_results.jtl' -j '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/jmeter_PTC_007_plan_jmeter.log' -Jjmeter.save.saveservice.output_format=csv -Jjmeter.save.saveservice.print_field_names=true -Jjmeter.save.saveservice.timestamp_format=ms -Jjmeter.save.saveservice.response_data=false -Jjmeter.save.saveservice.requestHeaders=false -Jjmeter.save.saveservice.responseHeaders=false -Jjmeter.save.saveservice.url=true
+
+===== JMeter stdout =====
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+Creating summariser <summary>
+Created the tree successfully using /Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/jmeter_PTC_007_plan.jmx
+Starting standalone test @ 2026 Oct 17 12:26:47 IST (1792220207232)
+Waiting for possible Shutdown/StopTestNow/HeapDump/ThreadDump message on port 4445
+summary +    133 in 00:00:13 =   10.5/s Avg:   439 Min:   261 Max:   832 Err:     0 (0.00%) Active: 60 Started: 60 Finished: 0
+summary +    294 in 00:00:30 =    9.8/s Avg:   323 Min:   259 Max:   453 Err:     0 (0.00%) Active: 60 Started: 60 Finished: 0
+summary =    427 in 00:00:43 =   10.0/s Avg:   359 Min:   259 Max:   832 Err:     0 (0.00%)
+summary +    177 in 00:00:18 =   10.0/s Avg:   327 Min:   261 Max:   756 Err:     0 (0.00%) Active: 0 Started: 60 Finished: 60
+summary =    604 in 00:01:00 =   10.0/s Avg:   350 Min:   259 Max:   832 Err:     0 (0.00%)
+Tidying up ...    @ 2026 Oct 17 12:27:47 IST (1792220267656)
+... end of run
+
+===== JMeter stderr =====
+WARNING: package sun.awt.X11 not in java.desktop
+
+===== JMeter exit status =====
+0
+
+===== JMeter timeout seconds =====
+180
+
+===== JMeter dashboard command =====
+/opt/homebrew/bin/jmeter -g '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/jmeter_PTC_007_plan_results.jtl' -o '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/.JOB-5a95bfe3178445e39b7f69007da62ffc_dashboard_j1d7ij9e/dashboard' -j '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-5a95bfe3178445e39b7f69007da62ffc/.JOB-5a95bfe3178445e39b7f69007da62ffc_dashboard_j1d7ij9e/jmeter_dashboard.log'
+
+===== Dashboard stdout =====
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+
+===== Dashboard stderr =====
+WARNING: package sun.awt.X11 not in java.desktop
+
+===== Dashboard exit status =====
+0
+

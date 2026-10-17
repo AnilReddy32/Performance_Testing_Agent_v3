@@ -569,7 +569,8 @@ def test_build_security_response_collects_all_issues_and_recommendations():
     response = build_security_response(state)
 
     assert response.status == SecurityStatus.WARNING
-    assert response.security_score == "N/A"
+    assert response.security_score == "50%"
+    assert "partial" in response.security_score_basis
 
     assert response.issues == [
         "JWT issue",

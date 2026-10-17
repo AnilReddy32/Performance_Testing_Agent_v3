@@ -1,18 +1,13 @@
-import json
-from pathlib import Path
 from typing import Any
-
-
-PROFILE_PATH = (
-    Path(__file__).resolve().parent.parent
-    / "data"
-    / "application_profile.json"
-)
+from google.adk.tools import ToolContext
+from security_agent.security.profiles import select_profile
+from security_agent.tools.state_utils import snapshot_session_state
 
 
 def get_api_information(
     endpoint: str | None = None,
     method: str | None = None,
+    tool_context: ToolContext | None = None,
 ) -> dict[str, Any]:
     """
     Retrieve API and endpoint information from the application profile.
@@ -32,27 +27,24 @@ def get_api_information(
         A dictionary containing the requested API information.
     """
 
-    if not PROFILE_PATH.exists():
-        return {
-            "success": False,
-            "error": "Application profile not found."
-        }
-
     try:
-        with PROFILE_PATH.open("r", encoding="utf-8") as file:
-            profile = json.load(file)
-
-    except json.JSONDecodeError:
+        selection = select_profile(
+            snapshot_session_state(tool_context.state) if tool_context else {}
+        )
+    except (OSError, ValueError) as exc:
         return {
             "success": False,
-            "error": "Application profile contains invalid JSON."
+            "error": f"Unable to load versioned application profiles: {exc}"
         }
 
-    except OSError as exc:
+    if selection["status"] != "matched":
         return {
             "success": False,
-            "error": f"Unable to read application profile: {exc}"
+            "profile_match_status": selection["status"],
+            "error": selection.get("reason", "A unique matching profile was not found."),
         }
+
+    profile = selection["data"]
 
     api_data = profile.get("api")
 
@@ -105,6 +97,8 @@ def get_api_information(
 
     return {
         "success": True,
+        "profile_id": selection["profile_id"],
+        "profile_version": selection["profile_version"],
         "base_url": api_data.get("base_url"),
         "version": api_data.get("version"),
         "endpoints": filtered_endpoints,

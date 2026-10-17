@@ -1,0 +1,64 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": true,
+  "workload_profile": {
+    "users": 20,
+    "max_rps": 12,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 59,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T05:46:24.694296+00:00",
+      "sampler_stopped_at": "2026-10-17T05:47:24.878630+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "not_collected": {
+        "database_connections": "No target-specific database telemetry provider is configured."
+      },
+      "sampling_error": null
+    },
+    "k6_time_series": {
+      "data_source": "k6 raw JSON point samples",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 13,
+    "alignment_origin": "k6_run_window.started_at",
+    "artifact": "k6_PTC_004_Filtered_Feedback_API_Load_Check_aligned_time_series.csv"
+  },
+  "metrics": {
+    "job_id": "JOB-992dd506a393453c8bf507c83bbb449d",
+    "application": "Unknown",
+    "scenario": "Filtered Feedback API \u2014 Load Check",
+    "api_name": "/comments?postId=1",
+    "total_requests": 715,
+    "successful_requests": 715,
+    "failed_requests": 0,
+    "avg_response_time": 285.04082657342644,
+    "p95_response_time": 1030.899799999999,
+    "max_response_time": 5796.213,
+    "throughput": 11.89116566552476,
+    "error_rate": 0.0,
+    "http_status": 200
+  }
+}

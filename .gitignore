@@ -7,6 +7,8 @@ wheels/
 *.egg-info/
 src/data/
 **/generated_data/
+**/generated_reports/
+
 # Virtual environments
 .venv/
 venv/

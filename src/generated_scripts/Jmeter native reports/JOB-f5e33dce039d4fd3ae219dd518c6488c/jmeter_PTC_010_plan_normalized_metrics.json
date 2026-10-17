@@ -1,0 +1,84 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": false,
+  "threshold_failures": [
+    "3 of 900 requests failed or returned a status other than 200."
+  ],
+  "runner": {
+    "name": "Apache JMeter",
+    "executable": "/opt/homebrew/bin/jmeter",
+    "java_executable": "/opt/homebrew/bin/java",
+    "exit_code": 0,
+    "timeout_seconds": 180,
+    "started_at": "2026-10-17T07:06:45.441735+00:00",
+    "finished_at": "2026-10-17T07:07:48.212290+00:00"
+  },
+  "workload_profile": {
+    "users": 250,
+    "max_rps": 15,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "latency_percentiles_ms": {
+    "p50": 306.0,
+    "p90": 517.0,
+    "p95": 594.0,
+    "p99": 1000.0
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 62,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T07:06:45.441601+00:00",
+      "sampler_stopped_at": "2026-10-17T07:07:48.212294+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "sampling_error": null
+    },
+    "jmeter_time_series": {
+      "data_source": "JMeter raw JTL sample rows",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "jmeter_run_window": {
+    "started_at": "2026-10-17T07:06:45.441735+00:00",
+    "finished_at": "2026-10-17T07:07:48.212290+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 13,
+    "source_bucket_count": 13,
+    "alignment_origin": "jmeter_run_window.started_at",
+    "artifact": "jmeter_PTC_010_plan_aligned_time_series.csv"
+  },
+  "metrics": {
+    "total_requests": 900,
+    "successful_requests": 897,
+    "failed_requests": 3,
+    "avg_response_time": 381.8822222222222,
+    "p95_response_time": 594.0,
+    "max_response_time": 3784.0,
+    "error_rate": 0.33333333333333337,
+    "http_status": 200,
+    "job_id": "JOB-f5e33dce039d4fd3ae219dd518c6488c",
+    "application": "Unknown",
+    "scenario": "Customer Comment API \u2014 Load Check",
+    "api_name": "/comments/1",
+    "throughput": 14.337977522430792
+  }
+}

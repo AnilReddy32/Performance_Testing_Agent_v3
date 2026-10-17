@@ -1,0 +1,15 @@
+timestamp,elapsed_seconds,bucket_duration_seconds,requests,successful_requests,failed_requests,avg_response_time_ms,throughput_rps,cpu_avg_percent,cpu_peak_percent,memory_avg_percent,memory_peak_percent,execution_data_source,execution_measurement_scope,monitoring_data_source,monitoring_measurement_scope,target_resource_metrics
+2026-10-17T07:03:05.081461+00:00,0,5,53,53,0,362.1276981132076,10.6,14.45,17.6,69.625,70.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:10.081461+00:00,5,5,59,59,0,371.74364406779654,11.8,12.42,18.2,68.32000000000001,68.9,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:15.081461+00:00,10,5,64,64,0,365.11362499999996,12.8,9.98,11.1,67.97999999999999,68.1,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:20.081461+00:00,15,5,60,60,0,371.03973333333323,12.0,8.78,10.6,67.97999999999999,68.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:25.081461+00:00,20,5,60,60,0,366.7149499999999,12.0,9.76,10.4,67.94000000000001,68.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:30.081461+00:00,25,5,59,59,0,369.55650847457633,11.8,9.02,10.5,68.0,68.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:35.081461+00:00,30,5,61,61,0,364.61791803278686,12.2,8.5,9.8,67.8,68.0,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:40.081461+00:00,35,5,60,60,0,365.38331666666653,12.0,8.48,8.7,67.74,67.8,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:45.081461+00:00,40,5,59,59,0,389.2148305084745,11.8,8.9,9.4,67.74,67.8,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:50.081461+00:00,45,5,61,61,0,370.51431147540967,12.2,8.76,9.3,67.8,67.9,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:03:55.081461+00:00,50,5,59,59,0,359.63603389830524,11.8,9.0,10.2,67.82000000000001,67.9,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:04:00.081461+00:00,55,5,60,60,0,365.80668333333347,12.0,9.52,10.8,67.8,67.9,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:04:05.081461+00:00,60,5,60,60,0,364.2084333333333,12.0,8.62,8.7,67.8,67.8,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false
+2026-10-17T07:04:10.081461+00:00,65,2.957615,37,37,0,356.7776756756756,12.510079912361817,8.166666666666666,8.6,67.83333333333333,67.9,k6,load_generator_observed_http_traffic,psutil,load_generator_host,false

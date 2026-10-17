@@ -1,0 +1,82 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": true,
+  "threshold_failures": [],
+  "runner": {
+    "name": "Apache JMeter",
+    "executable": "/opt/homebrew/bin/jmeter",
+    "java_executable": "/opt/homebrew/bin/java",
+    "exit_code": 0,
+    "timeout_seconds": 180,
+    "started_at": "2026-10-17T06:42:36.378555+00:00",
+    "finished_at": "2026-10-17T06:43:38.693900+00:00"
+  },
+  "workload_profile": {
+    "users": 45,
+    "max_rps": 20,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "latency_percentiles_ms": {
+    "p50": 109.0,
+    "p90": 185.0,
+    "p95": 222.0,
+    "p99": 410.0
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 62,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T06:42:36.378385+00:00",
+      "sampler_stopped_at": "2026-10-17T06:43:38.693906+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "sampling_error": null
+    },
+    "jmeter_time_series": {
+      "data_source": "JMeter raw JTL sample rows",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "jmeter_run_window": {
+    "started_at": "2026-10-17T06:42:36.378555+00:00",
+    "finished_at": "2026-10-17T06:43:38.693900+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 13,
+    "source_bucket_count": 13,
+    "alignment_origin": "jmeter_run_window.started_at",
+    "artifact": "jmeter_PTC_006_plan_aligned_time_series.csv"
+  },
+  "metrics": {
+    "total_requests": 1199,
+    "successful_requests": 1199,
+    "failed_requests": 0,
+    "avg_response_time": 129.37030859049207,
+    "p95_response_time": 222.0,
+    "max_response_time": 1018.0,
+    "error_rate": 0.0,
+    "http_status": 200,
+    "job_id": "JOB-5360a7c5f5294439bca1815bb5a6b180",
+    "application": "Unknown",
+    "scenario": "Product Catalog API \u2014 Load Check",
+    "api_name": "/products/1",
+    "throughput": 19.240871307898296
+  }
+}

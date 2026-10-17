@@ -67,6 +67,20 @@ def _format_count(value) -> str:
         return str(value)
 
 
+def _display_live_security_status(security_summary: Optional[dict]) -> str:
+    """Map internal live-check states to the four report-facing labels."""
+    if not security_summary:
+        return "not requested"
+    value = security_summary.get("live_testing_status")
+    if value in {"completed", "failed", "not_requested", "not_assessed"}:
+        return value.replace("_", " ")
+    if value in {"blocked", "not_run"}:
+        return "not assessed"
+    if security_summary.get("live_testing_requested"):
+        return "not assessed"
+    return "not requested"
+
+
 def _build_agent_activity_rows(
     application: str,
     scenario: str,
@@ -158,15 +172,40 @@ def _build_agent_activity_rows(
     rows.append(("Monitoring", mon_text))
 
     if security_summary:
-        sec_lines = [f"Status: {security_summary.get('status', 'UNKNOWN')}."]
+        sec_lines = [
+            f"Status: {security_summary.get('status', 'UNKNOWN')}.",
+            f"Security score: {security_summary.get('security_score', 'N/A')}.",
+            f"Live security check: {_display_live_security_status(security_summary)}.",
+        ]
+        if security_summary.get("security_score_basis"):
+            sec_lines.append(f"Security score basis: {security_summary['security_score_basis']}")
         for issue in security_summary.get("issues", []):
             sec_lines.append(f"Issue: {issue}")
+        if security_summary.get("coverage"):
+            sec_lines.append(f"Control coverage: {security_summary['coverage']}")
+        if security_summary.get("control_results"):
+            sec_lines.append("Control assessment evidence:")
+            for item in security_summary["control_results"]:
+                if isinstance(item, dict):
+                    sec_lines.append(
+                        "  - " + str(item.get("control", "control"))
+                        + ": " + str(item.get("assessment_status", "unknown"))
+                        + "; basis=" + str(item.get("assessment_basis", "not stated"))
+                        + "; evidence=" + str(item.get("evidence_references", []))
+                    )
+        if security_summary.get("evidence_references"):
+            sec_lines.append(
+                "Evidence references: " + ", ".join(map(str, security_summary["evidence_references"]))
+            )
+        if security_summary.get("limitations"):
+            sec_lines.append("Assessment limitations:")
+            sec_lines.extend(f"  - {item}" for item in security_summary["limitations"])
         recommendations = security_summary.get("recommendations", [])
         if recommendations:
             sec_lines.append(f"Recommendation: {recommendations[0]}")
         sec_text = "\n".join(sec_lines)
     else:
-        sec_text = "Security validation was not run for this job."
+        sec_text = "Security assessment: not requested for this job.\nLive security check: not requested."
     rows.append(("Security Validation", sec_text))
 
     rows.append(("Analysis", summary or "No analysis summary was provided."))
@@ -343,6 +382,29 @@ def build_report_sections(
     rendered as the very first section.
     """
     sections: List[dict] = []
+
+    if security_summary and security_summary.get("job_id") != job_id:
+        security_summary = None
+    if (
+        security_summary is None
+        and isinstance(execution_outcome, dict)
+        and execution_outcome.get("job_id") == job_id
+    ):
+        candidate_security = execution_outcome.get("security_result")
+        if isinstance(candidate_security, dict) and candidate_security.get("job_id") == job_id:
+            security_summary = candidate_security
+    if security_summary is None and isinstance(execution_outcome, dict):
+        if execution_outcome.get("job_id") == job_id and execution_outcome.get("security_requested") is True:
+            security_summary = {
+                "job_id": job_id,
+                "status": "NOT ASSESSED",
+                "security_score": "N/A",
+                "issues": ["A matching job-scoped security result was unavailable."],
+                "recommendations": [],
+                "live_testing_requested": False,
+                "live_testing_status": "not_assessed",
+                "limitations": ["No matching job-scoped security result was available to this report."],
+            }
 
     if test_case_prompt:
         sections.append({
@@ -630,7 +692,11 @@ def build_report_sections(
         lines = [
             f"Status: {security_summary.get('status', 'unknown')}   "
             f"Security score: {security_summary.get('security_score', 'unknown')}",
+            f"Security result job ID: {security_summary.get('job_id', 'unavailable')}.",
+            f"Live security check: {_display_live_security_status(security_summary)}.",
         ]
+        if security_summary.get("security_score_basis"):
+            lines.append(f"Security score basis: {security_summary['security_score_basis']}")
         issues = security_summary.get("issues", [])
         recs = security_summary.get("recommendations", [])
         if issues:
@@ -638,10 +704,58 @@ def build_report_sections(
             lines.extend(f"  - {i}" for i in issues)
         else:
             lines.append("Issues: none reported.")
+        if security_summary.get("coverage"):
+            lines.append(f"Control coverage: {security_summary['coverage']}")
+        for field, label in (
+            ("requested_controls", "Requested controls"),
+            ("assessed_controls", "Assessed controls"),
+            ("not_assessed_controls", "Not assessed controls"),
+        ):
+            if security_summary.get(field):
+                lines.append(f"{label}: {', '.join(map(str, security_summary[field]))}")
+        control_results = security_summary.get("control_results", [])
+        if control_results:
+            lines.append("Control evidence and provenance:")
+            for item in control_results:
+                if not isinstance(item, dict):
+                    continue
+                lines.append(
+                    "  - {control}: {result}; basis={basis}; evidence fields={fields}; references={refs}".format(
+                        control=item.get("control", "unknown"),
+                        result=item.get("assessment_status", "unknown"),
+                        basis=item.get("assessment_basis", "not stated"),
+                        fields=item.get("evidence_fields", []),
+                        refs=item.get("evidence_references", []),
+                    )
+                )
+        if security_summary.get("evidence_references"):
+            lines.append("Evidence references: " + ", ".join(map(str, security_summary["evidence_references"])))
+        live_result = security_summary.get("live_test_result")
+        if isinstance(live_result, dict):
+            observation = [
+                f"Live observation: {live_result.get('method', 'unknown')} "
+                f"{live_result.get('endpoint', 'unknown endpoint')}; "
+                f"HTTP {live_result.get('response_status_code', 'unavailable')}; "
+                f"elapsed {live_result.get('elapsed_ms', 'unavailable')} ms; "
+                f"requests sent {live_result.get('requests_sent', 'unknown')}.",
+            ]
+            headers = live_result.get("observed_security_headers")
+            if isinstance(headers, dict) and headers:
+                observation.append("Observed response headers (observations only):")
+                observation.extend(f"  - {name}: {value}" for name, value in headers.items())
+            lines.extend(observation)
+        if security_summary.get("limitations"):
+            lines.append("Assessment limitations:")
+            lines.extend(f"  - {item}" for item in security_summary["limitations"])
         if recs:
             lines.append("Recommendations:")
             lines.extend(f"  - {r}" for r in recs)
         sections.append({"title": "Security Findings (Security Agent)", "content": "\n".join(lines)})
+    else:
+        sections.append({
+            "title": "Security Findings (Security Agent)",
+            "content": "Security assessment: not requested for this job.\nLive security check: not requested.",
+        })
 
     fail_or_warn = [f for f in api_findings if f.get("status") in ("fail", "warning")]
     next_steps = [f"- {f.get('api_name', 'Unknown API')}: {f.get('recommendation') or 'Investigate flagged anomalies above.'}"

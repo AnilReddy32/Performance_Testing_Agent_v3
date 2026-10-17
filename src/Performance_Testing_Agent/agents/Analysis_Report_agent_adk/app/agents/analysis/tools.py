@@ -1091,18 +1091,46 @@ def analyze_infra_health(monitoring_result: dict, test_execution_avg_response_ti
 # security_agent -> pass-through summary (NEW)
 # ---------------------------------------------------------------------------
 
-def summarize_security(security_result: dict) -> dict:
+def summarize_security(security_result: dict, job_id: str) -> dict | None:
     """
     Mostly a pass-through -- security_agent already did the analysis, this
     agent's job is just to fold its verdict into the overall job status,
     not to re-judge security findings itself.
     """
-    return {
+    # Security output is optional evidence. Ignore a stale or unscoped result
+    # instead of failing performance analysis or attaching it to this job.
+    if not isinstance(security_result, dict) or security_result.get("job_id") != job_id:
+        return None
+
+    source_live_status = security_result.get("live_testing_status")
+    live_status_map = {
+        "completed": "completed",
+        "failed": "failed",
+        "not_requested": "not_requested",
+        "not_run": "not_assessed",
+        "blocked": "not_assessed",
+    }
+    live_status = live_status_map.get(
+        source_live_status,
+        "not_assessed" if security_result.get("live_testing_requested") else "not_requested",
+    )
+    keys = (
+        "job_id", "assessment_mode", "live_test_result", "requested_controls",
+        "assessed_controls", "not_assessed_controls", "coverage",
+        "required_evidence_by_control", "control_results",
+        "evidence_references", "limitations",
+    )
+    summary = {
         "status": security_result.get("status", "unknown"),
         "security_score": security_result.get("security_score", "unknown"),
+        "security_score_basis": security_result.get("security_score_basis", ""),
         "issues": security_result.get("issues", []),
         "recommendations": security_result.get("recommendations", []),
+        "live_testing_requested": bool(security_result.get("live_testing_requested")),
+        "live_testing_status": live_status,
     }
+    summary.update({key: security_result[key] for key in keys if key in security_result})
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -1193,12 +1221,20 @@ def finalize_analysis(
 
     if quality_report["status"] == "invalid":
         critical_issues = [i["issue"] for i in quality_report["issues"] if i["severity"] == "critical"]
+        security_obj = None
+        overall_status = "warning"
+        if isinstance(security_summary, dict) and security_summary.get("job_id") == job_id:
+            security_obj = SecuritySummary(**security_summary)
+            if security_obj.status.lower() == "fail":
+                overall_status = "fail"
         output = AnalysisOutput(
             job_id=job_id, application=application, scenario=scenario,
             test_case_prompt=test_case_prompt,
             data_quality_status="invalid",
             data_quality_issues=[DataQualityIssue(**i) for i in quality_report["issues"]],
             unusable_reason="; ".join(critical_issues) or "Data failed quality validation.",
+            overall_status=overall_status,
+            security_summary=security_obj,
             time_series_analysis=time_series_analysis,
             **execution_context,
             ready_for_report=False,
@@ -1218,10 +1254,11 @@ def finalize_analysis(
 
     security_obj = None
     if security_summary:
-        security_obj = SecuritySummary(**security_summary)
-        sec_status = security_obj.status.lower()
-        sec_rank = {"pass": 0, "warning": 1, "fail": 2}.get(sec_status, 1)  # unknown security status -> treat as warning, not silently pass
-        worst = max(worst, sec_rank)
+        if security_summary.get("job_id") == job_id:
+            security_obj = SecuritySummary(**security_summary)
+            sec_status = security_obj.status.lower()
+            sec_rank = {"pass": 0, "warning": 1, "fail": 2}.get(sec_status, 1)
+            worst = max(worst, sec_rank)
 
     if time_series_analysis and time_series_analysis.get("status") == "analyzed":
         severity_rank = {"info": 0, "warning": 1, "fail": 2}

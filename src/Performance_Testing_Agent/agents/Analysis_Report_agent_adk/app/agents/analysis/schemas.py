@@ -61,10 +61,23 @@ class MonitoringResult(BaseModel):
 
 class SecurityResult(BaseModel):
     """From security_agent. ONE summary for the whole job."""
+    job_id: str
     status: str  # PASS | FAIL | WARNING
     security_score: str  # e.g. "100%", "80%" -- kept as the string you gave, not parsed to a number
+    security_score_basis: Optional[str] = None
     issues: List[Any] = Field(default_factory=list)       # item shape not specified -- treated as opaque
     recommendations: List[Any] = Field(default_factory=list)  # item shape not specified -- treated as opaque
+    assessment_mode: Optional[str] = None
+    live_testing_requested: bool = False
+    live_testing_status: Optional[str] = None
+    requested_controls: List[str] = Field(default_factory=list)
+    assessed_controls: List[str] = Field(default_factory=list)
+    not_assessed_controls: List[str] = Field(default_factory=list)
+    coverage: dict[str, Any] = Field(default_factory=dict)
+    required_evidence_by_control: dict[str, List[str]] = Field(default_factory=dict)
+    control_results: List[dict[str, Any]] = Field(default_factory=list)
+    evidence_references: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
 
 
 class AnalysisInput(BaseModel):
@@ -125,10 +138,23 @@ class InfraHealthFinding(BaseModel):
 
 class SecuritySummary(BaseModel):
     """Passed through from security_agent, largely as-is."""
+    job_id: str
     status: str  # PASS | FAIL | WARNING (kept exactly as security_agent sent it)
     security_score: str
     issues: List[Any] = Field(default_factory=list)
     recommendations: List[Any] = Field(default_factory=list)
+    assessment_mode: Optional[str] = None
+    live_testing_requested: bool = False
+    live_testing_status: str = "not_requested"  # completed | failed | not_requested | not_assessed
+    live_test_result: Optional[dict[str, Any]] = None
+    requested_controls: List[str] = Field(default_factory=list)
+    assessed_controls: List[str] = Field(default_factory=list)
+    not_assessed_controls: List[str] = Field(default_factory=list)
+    coverage: dict[str, Any] = Field(default_factory=dict)
+    required_evidence_by_control: dict[str, List[str]] = Field(default_factory=dict)
+    control_results: List[dict[str, Any]] = Field(default_factory=list)
+    evidence_references: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
 
 
 class AnalysisOutput(BaseModel):

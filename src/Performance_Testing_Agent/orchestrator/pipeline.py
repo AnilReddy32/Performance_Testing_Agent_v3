@@ -136,7 +136,7 @@ async def complete_real_k6_pipeline(
             "user request for the current API/test context. Do not claim "
             "checks that were not performed. User request: " + user_query,
             "security_result",
-            current_job_required=False,
+            current_job_required=True,
         )
     else:
         pipeline["security"] = "skipped: not requested"
@@ -169,7 +169,7 @@ async def complete_real_k6_pipeline(
         "security_result": (
             state.get("security_result")
             if isinstance(state.get("security_result"), dict)
-            and state["security_result"].get("job_id") in (None, job_id)
+            and state["security_result"].get("job_id") == job_id
             else None
         ),
         "execution_artifacts": artifact_values,
@@ -194,6 +194,10 @@ async def complete_real_k6_pipeline(
             "analysis", "missing_result: current-job analysis is unavailable"
         )
         analysis = None
+    elif isinstance(analysis.get("security_summary"), dict):
+        if analysis["security_summary"].get("job_id") != job_id:
+            logger.warning("Ignoring Analysis security_summary with a mismatched job_id")
+            analysis["security_summary"] = None
 
     terminal_analysis_unusable = (
         analysis is None
@@ -212,6 +216,7 @@ async def complete_real_k6_pipeline(
         "job_id": job_id,
         "execution_mode": "REAL",
         "execution_status": execution_status,
+        "security_requested": security_requested,
         "runner_status": stage_status,
         "message": execution_message,
     }
@@ -281,6 +286,14 @@ async def complete_real_k6_pipeline(
                 f"REAL {tool} execution completed, but the available results could "
                 f"not be validated for analysis: {failure_message}"
             )
+        security_for_status = (analysis or {}).get("security_summary")
+        if not isinstance(security_for_status, dict):
+            security_for_status = outcome.get("security_result")
+        security_failed = (
+            isinstance(security_for_status, dict)
+            and str(security_for_status.get("status", "")).upper() == "FAIL"
+            and security_for_status.get("job_id") == job_id
+        )
         analysis = {
             **(analysis or {}),
             "job_id": job_id,
@@ -289,7 +302,9 @@ async def complete_real_k6_pipeline(
             "test_case_prompt": (analysis or {}).get("test_case_prompt") or user_query,
             "data_quality_status": (analysis or {}).get("data_quality_status") or "invalid",
             "unusable_reason": (analysis or {}).get("unusable_reason") or failure_message,
-            "overall_status": "fail" if execution_status == "failed" else "warning",
+            "overall_status": (
+                "fail" if execution_status == "failed" or security_failed else "warning"
+            ),
             "api_findings": (analysis or {}).get("api_findings") or [],
             "infra_health": (analysis or {}).get("infra_health"),
             "security_summary": (analysis or {}).get("security_summary"),

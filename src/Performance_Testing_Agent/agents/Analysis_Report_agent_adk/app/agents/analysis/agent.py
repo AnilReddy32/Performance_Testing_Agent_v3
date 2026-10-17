@@ -78,8 +78,13 @@ Follow this exact sequence:
    monitoring's own response_time against it. If monitoring_result was NOT
    provided, skip this step entirely -- do not fabricate infra data.
 
-5. If security_result was provided, call `summarize_security` with it. If
-   NOT provided, skip this step -- do not fabricate a security verdict.
+5. If security_result was provided, call `summarize_security` with it and
+   the current job_id. The tool accepts only an exact job_id match and
+   preserves control coverage, evidence provenance, assessment limitations,
+   and the normalized live-check status. If it returns None, omit
+   security_summary; continue performance analysis and reporting. If
+   security_result was NOT provided, skip this step -- do not fabricate a
+   security verdict.
 
 6. For each API with status "warning" or "fail" from step 2, call
    `retrieve_historical_context` (application, scenario, api_name, and an

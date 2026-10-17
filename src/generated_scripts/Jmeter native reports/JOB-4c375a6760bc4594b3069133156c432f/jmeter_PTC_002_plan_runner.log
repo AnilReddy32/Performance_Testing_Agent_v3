@@ -1,0 +1,41 @@
+===== Java executable =====
+/opt/homebrew/bin/java
+
+===== Java version check =====
+openjdk version "17.0.20.1" 2026-08-18
+OpenJDK Runtime Environment Homebrew (build 17.0.20.1+0)
+OpenJDK 64-Bit Server VM Homebrew (build 17.0.20.1+0, mixed mode, sharing)
+
+===== Resolved JMeter executable =====
+/opt/homebrew/bin/jmeter
+
+===== JMeter command =====
+/opt/homebrew/bin/jmeter -n -f -t '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-4c375a6760bc4594b3069133156c432f/jmeter_PTC_002_plan.jmx' -l '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-4c375a6760bc4594b3069133156c432f/jmeter_PTC_002_plan_results.jtl' -j '/Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-4c375a6760bc4594b3069133156c432f/jmeter_PTC_002_plan_jmeter.log' -Jjmeter.save.saveservice.output_format=csv -Jjmeter.save.saveservice.print_field_names=true -Jjmeter.save.saveservice.timestamp_format=ms -Jjmeter.save.saveservice.response_data=false -Jjmeter.save.saveservice.requestHeaders=false -Jjmeter.save.saveservice.responseHeaders=false -Jjmeter.save.saveservice.url=true
+
+===== JMeter stdout before timeout =====
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+Creating summariser <summary>
+Created the tree successfully using /Users/anilreddyperugu/Downloads/real_execution_agent/ANZ-performance-testing-agent-V2/src/generated_scripts/Jmeter native reports/JOB-4c375a6760bc4594b3069133156c432f/jmeter_PTC_002_plan.jmx
+Starting standalone test @ 2026 Oct 17 11:49:32 IST (1792217972043)
+Waiting for possible Shutdown/StopTestNow/HeapDump/ThreadDump message on port 4445
+summary +      1 in 00:00:01 =    1.1/s Avg:   365 Min:   365 Max:   365 Err:     0 (0.00%) Active: 2 Started: 2 Finished: 0
+summary +    218 in 00:00:27 =    8.1/s Avg:   232 Min:    76 Max:  2702 Err:     0 (0.00%) Active: 10 Started: 10 Finished: 0
+summary =    219 in 00:00:28 =    7.8/s Avg:   232 Min:    76 Max:  2702 Err:     0 (0.00%)
+summary +    239 in 00:00:30 =    7.9/s Avg:   222 Min:    73 Max:  5120 Err:     0 (0.00%) Active: 10 Started: 10 Finished: 0
+summary =    458 in 00:00:58 =    7.9/s Avg:   227 Min:    73 Max:  5120 Err:     0 (0.00%)
+
+===== JMeter stderr before timeout =====
+WARNING: package sun.awt.X11 not in java.desktop
+
+===== JMeter exit status =====
+timed out; process group terminated
+
+===== JMeter timeout seconds =====
+180
+
+===== Runner outcome =====
+JMeter exceeded its bounded timeout of 180 seconds; the JMeter process group was terminated.
+

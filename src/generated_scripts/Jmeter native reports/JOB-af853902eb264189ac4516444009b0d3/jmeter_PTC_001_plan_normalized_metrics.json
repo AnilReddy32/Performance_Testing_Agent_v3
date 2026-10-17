@@ -1,0 +1,82 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": true,
+  "threshold_failures": [],
+  "runner": {
+    "name": "Apache JMeter",
+    "executable": "/opt/homebrew/bin/jmeter",
+    "java_executable": "/opt/homebrew/bin/java",
+    "exit_code": 0,
+    "timeout_seconds": 180,
+    "started_at": "2026-10-17T05:07:07.635184+00:00",
+    "finished_at": "2026-10-17T05:08:09.842534+00:00"
+  },
+  "workload_profile": {
+    "users": 1,
+    "max_rps": 1,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "latency_percentiles_ms": {
+    "p50": 100.0,
+    "p90": 113.0,
+    "p95": 116.0,
+    "p99": 442.0
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 61,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T05:07:07.634999+00:00",
+      "sampler_stopped_at": "2026-10-17T05:08:09.842542+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "sampling_error": null
+    },
+    "jmeter_time_series": {
+      "data_source": "JMeter raw JTL sample rows",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "jmeter_run_window": {
+    "started_at": "2026-10-17T05:07:07.635184+00:00",
+    "finished_at": "2026-10-17T05:08:09.842534+00:00"
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 13,
+    "source_bucket_count": 13,
+    "alignment_origin": "jmeter_run_window.started_at",
+    "artifact": "jmeter_PTC_001_plan_aligned_time_series.csv"
+  },
+  "metrics": {
+    "total_requests": 61,
+    "successful_requests": 61,
+    "failed_requests": 0,
+    "avg_response_time": 106.32786885245902,
+    "p95_response_time": 116.0,
+    "max_response_time": 442.0,
+    "error_rate": 0.0,
+    "http_status": 200,
+    "job_id": "JOB-af853902eb264189ac4516444009b0d3",
+    "application": "Unknown",
+    "scenario": "Content Record Retrieval API \u2014 Load Check",
+    "api_name": "/posts/1",
+    "throughput": 0.9805845215884512
+  }
+}

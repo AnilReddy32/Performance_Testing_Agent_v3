@@ -1,0 +1,64 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": true,
+  "workload_profile": {
+    "users": 1,
+    "max_rps": 1,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 59,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T02:56:34.461627+00:00",
+      "sampler_stopped_at": "2026-10-17T02:57:34.619610+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "not_collected": {
+        "database_connections": "No target-specific database telemetry provider is configured."
+      },
+      "sampling_error": null
+    },
+    "k6_time_series": {
+      "data_source": "k6 raw JSON point samples",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 13,
+    "alignment_origin": "k6_run_window.started_at",
+    "artifact": "k6_PTC_001_Content_Record_Retrieval_API_Load_Check_aligned_time_series.csv"
+  },
+  "metrics": {
+    "job_id": "JOB-fcb38778b03846e3852d4a9c8e2d78fb",
+    "application": "Unknown",
+    "scenario": "Content Record Retrieval API \u2014 Load Check",
+    "api_name": "/posts/1",
+    "total_requests": 61,
+    "successful_requests": 61,
+    "failed_requests": 0,
+    "avg_response_time": 93.81836065573768,
+    "p95_response_time": 103.474,
+    "max_response_time": 107.52,
+    "throughput": 1.0148838709148242,
+    "error_rate": 0.0,
+    "http_status": 200
+  }
+}

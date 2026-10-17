@@ -1,0 +1,64 @@
+{
+  "execution_mode": "REAL",
+  "thresholds_passed": true,
+  "workload_profile": {
+    "users": 120,
+    "max_rps": 12,
+    "duration_seconds": 60,
+    "ramp_up_seconds": 5
+  },
+  "measurement_sources": {
+    "runtime_samples": {
+      "status": "available",
+      "data_source": "psutil",
+      "measurement_scope": "load_generator_host",
+      "target_resource_metrics": false,
+      "sample_count": 67,
+      "sample_interval_seconds": 1.0,
+      "sampler_started_at": "2026-10-17T07:03:05.081339+00:00",
+      "sampler_stopped_at": "2026-10-17T07:04:13.039090+00:00",
+      "metrics": [
+        "cpu_percent",
+        "memory_percent"
+      ],
+      "not_collected": {
+        "database_connections": "No target-specific database telemetry provider is configured."
+      },
+      "sampling_error": null
+    },
+    "k6_time_series": {
+      "data_source": "k6 raw JSON point samples",
+      "measurement_scope": "load_generator_observed_http_traffic",
+      "target_resource_metrics": false,
+      "metrics": [
+        "requests",
+        "successful_requests",
+        "failed_requests",
+        "avg_response_time_ms",
+        "throughput_rps"
+      ]
+    }
+  },
+  "shared_time_series": {
+    "schema_version": "1.0",
+    "bucket_seconds": 5,
+    "bucket_count": 14,
+    "alignment_origin": "k6_run_window.started_at",
+    "artifact": "k6_PTC_009_Customer_Directory_API_Load_Check_aligned_time_series.csv"
+  },
+  "metrics": {
+    "job_id": "JOB-5b3101bb77334ec6b007e6c3deffcd9b",
+    "application": "Unknown",
+    "scenario": "Customer Directory API \u2014 Load Check",
+    "api_name": "/users/1",
+    "total_requests": 812,
+    "successful_requests": 812,
+    "failed_requests": 0,
+    "avg_response_time": 367.6255874384237,
+    "p95_response_time": 450.38495,
+    "max_response_time": 781.174,
+    "throughput": 11.959729880957974,
+    "error_rate": 0.0,
+    "http_status": 200
+  }
+}
