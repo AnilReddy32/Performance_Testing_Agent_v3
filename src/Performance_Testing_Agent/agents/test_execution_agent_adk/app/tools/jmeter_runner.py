@@ -137,6 +137,39 @@ def _run_command(
     )
 
 
+##------------------
+# def _child_environment() -> dict[str, str]:
+#     allowed_names = {
+#         "PATH",
+#         "HOME",
+#         "JAVA_HOME",
+#         "JRE_HOME",
+#         "JMETER_HOME",
+#         "TMPDIR",
+#         "TMP",
+#         "TEMP",
+#         "LANG",
+#         "LC_ALL",
+#         "SSL_CERT_FILE",
+#         "SSL_CERT_DIR",
+#         # Required on Windows: subprocess.Popen launches .BAT files through
+#         # cmd.exe, which needs SystemRoot (e.g. C:\Windows) to locate system
+#         # DLLs and bootstrap the process at all - without it, the process
+#         # can fail immediately with no stdout/stderr output and exit code 1,
+#         # before the target program (JMeter) ever gets a chance to run or log
+#         # anything. COMSPEC (the path to cmd.exe itself) is included for the
+#         # same reason.
+#         "SystemRoot",
+#         "COMSPEC",
+#     }
+#     return {
+#         name: value
+#         for name, value in os.environ.items()
+#         if name in allowed_names
+#     }
+
+
+
 def _child_environment() -> dict[str, str]:
     allowed_names = {
         "PATH",
@@ -151,27 +184,17 @@ def _child_environment() -> dict[str, str]:
         "LC_ALL",
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
-        # Windows needs these: without SYSTEMROOT the JVM cannot initialize
-        # Winsock (socket error 10106) and every request fails to connect.
-        "SYSTEMROOT",
-        "SYSTEMDRIVE",
-        "WINDIR",
+        "SystemRoot",
         "COMSPEC",
-        "PATHEXT",
-        "USERPROFILE",
-        "APPDATA",
-        "LOCALAPPDATA",
-        "PROGRAMDATA",
-        "PROGRAMFILES",
-        "PROGRAMFILES(X86)",
     }
+    allowed_upper = {name.upper() for name in allowed_names}
     return {
         name: value
         for name, value in os.environ.items()
-        if name in allowed_names
+        if name.upper() in allowed_upper
     }
 
-
+##$--------------
 def _escape_java_property(value: str) -> str:
     escaped: list[str] = []
     for index, character in enumerate(value):

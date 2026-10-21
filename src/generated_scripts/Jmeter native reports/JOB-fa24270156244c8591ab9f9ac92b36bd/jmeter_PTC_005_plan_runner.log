@@ -1,0 +1,29 @@
+===== Java executable =====
+C:\Program Files\Java\jdk-21\bin\java.EXE
+
+===== Java version check =====
+java version "21.0.5" 2024-10-15 LTS
+Java(TM) SE Runtime Environment (build 21.0.5+9-LTS-239)
+Java HotSpot(TM) 64-Bit Server VM (build 21.0.5+9-LTS-239, mixed mode, sharing)
+
+===== Resolved JMeter executable =====
+C:\apache-jmeter-5.6.3\bin\jmeter.BAT
+
+===== JMeter command =====
+'C:\apache-jmeter-5.6.3\bin\jmeter.BAT' -n -f -t 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-fa24270156244c8591ab9f9ac92b36bd\jmeter_PTC_005_plan.jmx' -l 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-fa24270156244c8591ab9f9ac92b36bd\jmeter_PTC_005_plan_results.jtl' -j 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-fa24270156244c8591ab9f9ac92b36bd\jmeter_PTC_005_plan_jmeter.log' -Jjmeter.save.saveservice.output_format=csv -Jjmeter.save.saveservice.print_field_names=true -Jjmeter.save.saveservice.timestamp_format=ms -Jjmeter.save.saveservice.response_data=false -Jjmeter.save.saveservice.requestHeaders=false -Jjmeter.save.saveservice.responseHeaders=false -Jjmeter.save.saveservice.url=true
+
+===== JMeter stdout =====
+
+
+===== JMeter stderr =====
+
+
+===== JMeter exit status =====
+1
+
+===== JMeter timeout seconds =====
+180
+
+===== Runner outcome =====
+JMeter failed with exit code 1; see the runner and JMeter logs.
+

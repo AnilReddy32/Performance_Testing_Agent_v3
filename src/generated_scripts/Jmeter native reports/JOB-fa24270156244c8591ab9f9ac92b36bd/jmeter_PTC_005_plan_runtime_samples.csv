@@ -1,0 +1,2 @@
+timestamp,elapsed_seconds,cpu_percent,memory_percent,measurement_scope,data_source,target_resource_metric
+2026-10-19T12:55:16.708409+00:00,1.025,0.0,95.2,load_generator_host,psutil,false

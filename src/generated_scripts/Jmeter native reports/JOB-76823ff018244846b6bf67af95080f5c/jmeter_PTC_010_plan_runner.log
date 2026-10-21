@@ -1,0 +1,55 @@
+===== Java executable =====
+C:\Program Files\Java\jdk-21\bin\java.EXE
+
+===== Java version check =====
+java version "21.0.5" 2024-10-15 LTS
+Java(TM) SE Runtime Environment (build 21.0.5+9-LTS-239)
+Java HotSpot(TM) 64-Bit Server VM (build 21.0.5+9-LTS-239, mixed mode, sharing)
+
+===== Resolved JMeter executable =====
+C:\apache-jmeter-5.6.3\bin\jmeter.BAT
+
+===== JMeter command =====
+'C:\apache-jmeter-5.6.3\bin\jmeter.BAT' -n -f -t 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\jmeter_PTC_010_plan.jmx' -l 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\jmeter_PTC_010_plan_results.jtl' -j 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\jmeter_PTC_010_plan_jmeter.log' -Jjmeter.save.saveservice.output_format=csv -Jjmeter.save.saveservice.print_field_names=true -Jjmeter.save.saveservice.timestamp_format=ms -Jjmeter.save.saveservice.response_data=false -Jjmeter.save.saveservice.requestHeaders=false -Jjmeter.save.saveservice.responseHeaders=false -Jjmeter.save.saveservice.url=true
+
+===== JMeter stdout =====
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+Creating summariser <summary>
+Created the tree successfully using C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\jmeter_PTC_010_plan.jmx
+Starting standalone test @ 2026 Oct 19 22:46:35 IST (1792430195370)
+Waiting for possible Shutdown/StopTestNow/HeapDump/ThreadDump message on port 4445
+summary +    402 in 00:00:25 =   16.3/s Avg:  1179 Min:   402 Max:  6389 Err:     0 (0.00%) Active: 250 Started: 250 Finished: 0
+summary +    413 in 00:00:30 =   13.8/s Avg:   758 Min:   356 Max:  9166 Err:     0 (0.00%) Active: 96 Started: 250 Finished: 154
+summary =    815 in 00:00:55 =   14.9/s Avg:   966 Min:   356 Max:  9166 Err:     0 (0.00%)
+summary +     95 in 00:00:06 =   15.5/s Avg:   685 Min:   394 Max:  1984 Err:     0 (0.00%) Active: 0 Started: 250 Finished: 250
+summary =    910 in 00:01:01 =   15.0/s Avg:   936 Min:   356 Max:  9166 Err:     0 (0.00%)
+Tidying up ...    @ 2026 Oct 19 22:47:36 IST (1792430256218)
+... end of run
+
+===== JMeter stderr =====
+
+
+===== JMeter exit status =====
+0
+
+===== JMeter timeout seconds =====
+180
+
+===== JMeter dashboard command =====
+'C:\apache-jmeter-5.6.3\bin\jmeter.BAT' -g 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\jmeter_PTC_010_plan_results.jtl' -o 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\.JOB-76823ff018244846b6bf67af95080f5c_dashboard_vi12gl84\dashboard' -j 'C:\Users\sharma.an\Downloads\PTA_FINAL_V3\Performance_Testing_Agent_v3\src\generated_scripts\Jmeter native reports\JOB-76823ff018244846b6bf67af95080f5c\.JOB-76823ff018244846b6bf67af95080f5c_dashboard_vi12gl84\jmeter_dashboard.log'
+
+===== Dashboard stdout =====
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+WARN StatusConsoleListener The use of package scanning to locate plugins is deprecated and will be removed in a future release
+
+===== Dashboard stderr =====
+
+
+===== Dashboard exit status =====
+0
+
