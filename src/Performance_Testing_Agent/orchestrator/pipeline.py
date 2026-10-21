@@ -45,12 +45,18 @@ async def complete_real_k6_pipeline(
     report_agent: Any,
     agents_called: list[str] | None = None,
     persist_state: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
+    monitoring_requested: bool | None = None,
+    security_requested: bool | None = None,
 ) -> dict[str, str] | None:
     """Fill missing downstream stages for terminal REAL k6 and JMeter jobs.
 
     The supplied invoker determines the ADK entry point, while this function
     owns common gating, job checks, and idempotent stage sequencing. It never
     starts or repeats the load test.
+
+    monitoring_requested / security_requested let a caller that has already
+    planned its stages decide them explicitly. None keeps the default: monitor
+    every completed run, and run security only when the query asks for it.
     """
     profile = state.get("workload_profile")
     tool = profile.get("tool") if isinstance(profile, dict) else None
@@ -113,7 +119,9 @@ async def complete_real_k6_pipeline(
             logger.exception("REAL performance pipeline stage %s failed", stage)
             pipeline[stage] = f"failed: {type(exc).__name__}: {exc}"
 
-    if execution_status == "completed":
+    if monitoring_requested is False:
+        pipeline["monitoring"] = "skipped: not requested"
+    elif execution_status == "completed":
         await invoke_if_missing(
             "monitoring",
             monitoring_agent,
@@ -125,9 +133,10 @@ async def complete_real_k6_pipeline(
     else:
         pipeline["monitoring"] = "skipped: execution was not completed"
 
-    security_requested = bool(_SECURITY_REQUEST.search(user_query)) and not bool(
-        _SECURITY_NEGATION.search(user_query)
-    )
+    if security_requested is None:
+        security_requested = bool(_SECURITY_REQUEST.search(user_query)) and not bool(
+            _SECURITY_NEGATION.search(user_query)
+        )
     if security_requested:
         await invoke_if_missing(
             "security",

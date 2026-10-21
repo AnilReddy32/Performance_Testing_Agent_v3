@@ -3,7 +3,7 @@
     "test_case_id": "PTC-001",
     "name": "Content Record Retrieval API — Load Check",
     "execution_mode": "REAL",
-    "tool": "k6",
+    "tool": "jmeter",
     "environment": "external_api",
     "target_url": "https://jsonplaceholder.typicode.com",
     "api": "JSONPlaceholder Posts API",

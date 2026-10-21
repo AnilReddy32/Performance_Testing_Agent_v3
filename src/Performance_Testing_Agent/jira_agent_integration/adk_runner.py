@@ -6,11 +6,22 @@ from Performance_Testing_Agent.execution_context import (
     create_execution_job_context,
 )
 from Performance_Testing_Agent.orchestrator.agent import root_agent
+from Performance_Testing_Agent.orchestrator.orchestrator import Orchestrator
 
 from uuid import uuid4
 
 APP_NAME = "jira_agent_integration"
 USER_ID = "jira_user"
+
+_stage_orchestrator: Orchestrator | None = None
+
+
+async def run_stage_plan(**stage_inputs) -> dict:
+    """Run a bound REAL catalog job stage by stage (see Orchestrator.execute_stage_plan)."""
+    global _stage_orchestrator
+    if _stage_orchestrator is None:
+        _stage_orchestrator = Orchestrator()
+    return await _stage_orchestrator.execute_stage_plan(**stage_inputs)
 
 async def run_orchestrator(
     prompt: str,

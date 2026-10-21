@@ -8,6 +8,7 @@ wheels/
 src/data/
 **/generated_data/
 **/generated_reports/
+**/generated_scripts/
 
 # Virtual environments
 .venv/

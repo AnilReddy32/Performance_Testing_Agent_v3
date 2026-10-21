@@ -151,6 +151,19 @@ def _child_environment() -> dict[str, str]:
         "LC_ALL",
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
+        # Windows needs these: without SYSTEMROOT the JVM cannot initialize
+        # Winsock (socket error 10106) and every request fails to connect.
+        "SYSTEMROOT",
+        "SYSTEMDRIVE",
+        "WINDIR",
+        "COMSPEC",
+        "PATHEXT",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "PROGRAMDATA",
+        "PROGRAMFILES",
+        "PROGRAMFILES(X86)",
     }
     return {
         name: value

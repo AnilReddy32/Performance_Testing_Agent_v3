@@ -30,6 +30,7 @@ from .agent import (
     report_agent,
     root_agent,
     security_agent,
+    test_execution_agent,
 )
 from .logger import logger
 from .pipeline import complete_real_k6_pipeline, json_object
@@ -110,6 +111,8 @@ class Orchestrator:
         user_query: str,
         state: dict,
         agents_called: list[str],
+        monitoring_requested: bool | None = None,
+        security_requested: bool | None = None,
     ) -> tuple[dict, dict] | None:
         async def invoke_and_refresh(agent, message: str) -> None:
             await self._invoke_agent(
@@ -141,8 +144,110 @@ class Orchestrator:
             report_agent=report_agent,
             agents_called=agents_called,
             persist_state=persist_state,
+            monitoring_requested=monitoring_requested,
+            security_requested=security_requested,
         )
         return (state, pipeline) if pipeline is not None else None
+
+    async def execute_stage_plan(
+        self,
+        *,
+        execution_context: dict,
+        execution_message: str,
+        request_text: str,
+        monitoring_requested: bool,
+        security_requested: bool,
+    ) -> dict:
+        """Run an already-bound REAL catalog job one stage at a time.
+
+        The caller has bound the trusted workload profile, runner and mode in
+        execution_context. Order is controlled here, in code, instead of being
+        left to an LLM: the execution agent first, then monitoring, security
+        (only if requested), analysis and the PDF report, one agent at a time,
+        each reading the previous stage's result from shared session state.
+        """
+        user_id = "api_user"
+        session_id = str(uuid.uuid4())
+        await self.session_service.create_session(
+            app_name=ADK_APP_NAME,
+            user_id=user_id,
+            session_id=session_id,
+            # Same key record_test_case_prompt writes; the report prints it as
+            # the original request.
+            state={**execution_context, "test_case_prompt": request_text},
+        )
+
+        agents_called = [test_execution_agent.name]
+        await self._invoke_agent(
+            test_execution_agent,
+            user_id=user_id,
+            session_id=session_id,
+            message=execution_message,
+        )
+        state = await self._get_state(user_id, session_id)
+
+        pipeline_result = await self._complete_real_k6_pipeline(
+            user_id=user_id,
+            session_id=session_id,
+            user_query=request_text,
+            state=state,
+            agents_called=agents_called,
+            monitoring_requested=monitoring_requested,
+            security_requested=security_requested,
+        )
+        if pipeline_result is not None:
+            state, pipeline = pipeline_result
+        else:
+            # Execution never reached a terminal status, so no later stage ran.
+            pipeline = {}
+
+        job_id = state.get("job_id")
+        tool = (state.get("workload_profile") or {}).get("tool")
+        execution_stage = json_object(state.get("execution_stage_result")) or {}
+
+        report = json_object(state.get("report_result")) or {}
+        report_path = report.get("file_path")
+        if not (
+            isinstance(report_path, str)
+            and report_path.strip()
+            and report.get("report_format") in {"pdf", "both"}
+            and report.get("rejected") is False
+        ):
+            report_path = None
+
+        artifacts: dict[str, str] = {}
+        manifest = state.get("execution_artifacts")
+        names = (
+            manifest.get("artifacts", {})
+            if isinstance(manifest, dict) and manifest.get("job_id") == job_id
+            else {}
+        )
+        if isinstance(job_id, str) and isinstance(names, dict):
+            job_directory = resolve_artifact_directory(job_id, tool=tool).resolve()
+            for key in (
+                "native_report_entrypoint",
+                "native_report_archive",
+                "raw_results",
+                "runner_log",
+            ):
+                filename = names.get(key)
+                if not isinstance(filename, str):
+                    continue
+                path = (job_directory / filename).resolve()
+                if path.is_relative_to(job_directory) and path.is_file():
+                    artifacts[key] = str(path)
+
+        logger.info(f"Stage plan agents called: {agents_called}")
+        return {
+            "job_id": job_id,
+            "execution_status": state.get("execution_status"),
+            "execution_message": execution_stage.get("message"),
+            "thresholds_passed": execution_stage.get("thresholds_passed"),
+            "pipeline": pipeline,
+            "report_path": report_path,
+            "artifacts": artifacts,
+            "agents_called": agents_called,
+        }
 
     async def execute(
         self,
