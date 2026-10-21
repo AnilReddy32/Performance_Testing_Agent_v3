@@ -2,8 +2,15 @@ from Performance_Testing_Agent.jira_agent_integration.app.jira_client import get
 
 from Performance_Testing_Agent.jira_agent_integration.attachment_service import extract_attachment, MAX_ATTACHMENTS_PER_ISSUE, SUPPORTED_EXTENSIONS
 
-from Performance_Testing_Agent.jira_agent_integration.adk_runner import run_orchestrator
+from Performance_Testing_Agent.jira_agent_integration.adk_runner import run_orchestrator, run_stage_plan
 
+from Performance_Testing_Agent.jira_agent_integration.stage_plan import (
+    build_execution_message,
+    build_stage_plan,
+    evaluate_done,
+    format_plan_comment,
+    format_result_comment,
+)
 from Performance_Testing_Agent.jira_agent_integration.test_case_resolver import (
     resolve_issue_test_case,
     build_test_case_prompt,
@@ -11,6 +18,8 @@ from Performance_Testing_Agent.jira_agent_integration.test_case_resolver import 
 from Performance_Testing_Agent.execution_context import (
     create_context_for_test_case,
     create_execution_job_context,
+    requested_execution_tool,
+    workload_profile_from_test_case,
 )
 
 import json
@@ -173,6 +182,106 @@ async def extract_issue_attachments(attachments):
         # }
 
 
+async def run_planned_test_case(
+    *,
+    issue_key: str,
+    summary: str,
+    prompt_text: str,
+    test_definition: dict,
+    execution_context: dict,
+    tool_overridden: bool,
+    catalog_tool: str | None,
+) -> dict:
+    """Plan from the Jira text, then run the stages one at a time.
+
+    Used for catalog test cases that run for real (k6 or JMeter). The workload
+    comes from the test case; the text only picks the stages around it.
+    """
+    test_case_id = test_definition["test_case_id"]
+    tool = execution_context["workload_profile"]["tool"]
+    plan = build_stage_plan(prompt_text, test_case_id=test_case_id)
+
+    plan_comment = format_plan_comment(
+        plan,
+        test_case_id=test_case_id,
+        test_case_name=str(test_definition.get("name", test_case_id)),
+        tool=tool,
+        tool_overridden=tool_overridden,
+        catalog_tool=catalog_tool,
+    )
+    print(f"{issue_key}: Posting execution plan...")
+    try:
+        add_issue_comment(issue_key, plan_comment)
+    except Exception as exc:
+        # A failed comment must not stop the run.
+        print(f"{issue_key}: Could not post the plan comment: {exc}")
+
+    outcome = {
+        "issue_key": issue_key,
+        "summary": summary,
+        "input_source": "TEST_CASE",
+        "test_case_id": test_case_id,
+    }
+
+    if not plan.execute:
+        print(f"{issue_key}: The text asks not to run the test; nothing was started.")
+        return {**outcome, "status": "Not Executed", "plan": plan_comment}
+
+    try:
+        print(f"{issue_key}: Running stages one at a time...")
+        result = await run_stage_plan(
+            execution_context=execution_context,
+            execution_message=build_execution_message(test_case_id, tool),
+            request_text=prompt_text,
+            monitoring_requested=plan.monitoring,
+            security_requested=plan.security,
+        )
+
+        done, not_done_reason = evaluate_done(result)
+        comment_result = add_issue_comment(
+            issue_key,
+            format_result_comment(
+                result,
+                test_case_id=test_case_id,
+                tool=tool,
+                tool_overridden=tool_overridden,
+                catalog_tool=catalog_tool,
+                done=done,
+                not_done_reason=not_done_reason,
+            ),
+        )
+        print(f"{issue_key}: Comment created (ID: {comment_result['id']})")
+
+        if done:
+            print(f"{issue_key}: Moving to Done...")
+            transition_issue(issue_key, "31")
+            print(f"=========={issue_key} COMPLETED ============")
+        else:
+            print(f"{issue_key}: Left In Progress: {not_done_reason}")
+
+        return {
+            **outcome,
+            "status": "Done" if done else "In Progress",
+            "comment_id": comment_result["id"],
+            "execution_status": result.get("execution_status"),
+            "pipeline": result.get("pipeline"),
+            "report_path": result.get("report_path"),
+        }
+
+    except Exception as e:
+        print(f"{issue_key}: FAILED - {e}")
+        try:
+            add_issue_comment(
+                issue_key,
+                "Performance Testing Agent — Processing Failed\n\n"
+                f"{type(e).__name__}: {e}\n\n"
+                "Jira status: left In Progress.",
+            )
+        except Exception as comment_error:
+            print(f"{issue_key}: Could not post the failure comment: {comment_error}")
+        return {**outcome, "status": "Failed", "error": str(e)}
+
+
 async def process_single_issue(issue):
     issue_key = issue["key"]
     fields = issue["fields"]
@@ -198,12 +307,35 @@ async def process_single_issue(issue):
             "error": str(exc),
         }
 
+    description_text = adf_to_text(description).strip()
+
+    # With a Test Case ID selected, every workload value comes from the
+    # catalog. The only thing the Jira text may change is the runner: naming
+    # k6 or JMeter (e.g. "run this using JMeter") replaces the catalog's tool.
+    requested_tool = None
+    catalog_tool = None
+    context_tool = None
+
     try:
-        execution_context = (
-            create_context_for_test_case(test_definition, source_id=issue_key)
-            if test_definition
-            else create_execution_job_context(source_id=issue_key)
-        )
+        if test_definition:
+            catalog_tool = workload_profile_from_test_case(test_definition).tool
+            # Only cases that define a workload have a runner to replace.
+            if catalog_tool is not None:
+                requested_tool = requested_execution_tool(
+                    f"{summary or ''}\n{description_text}"
+                )
+            # k6 and JMeter cases run for real. Name the runner explicitly so
+            # the job is REAL even when the catalog's own tool is JMeter.
+            context_tool = requested_tool or (
+                catalog_tool if catalog_tool in {"k6", "jmeter"} else None
+            )
+            execution_context = create_context_for_test_case(
+                test_definition,
+                source_id=issue_key,
+                requested_tool=context_tool,
+            )
+        else:
+            execution_context = create_execution_job_context(source_id=issue_key)
     except ValueError as exc:
         return {
             "issue_key": issue_key,
@@ -212,8 +344,14 @@ async def process_single_issue(issue):
             "error": str(exc),
         }
 
+    tool_overridden = requested_tool is not None and requested_tool != catalog_tool
+    if tool_overridden:
+        print(
+            f"{issue_key}: Runner selected in Jira text: {requested_tool} "
+            f"(catalog default: {catalog_tool})"
+        )
+
     attachment_content = ""
-    description_text = adf_to_text(description).strip()
 
     if test_definition:
         input_source = "TEST_CASE"
@@ -251,6 +389,18 @@ async def process_single_issue(issue):
     print(f"{issue_key}: Moving to In Progress...")
     transition_issue(issue_key, "21")
 
+    if test_definition and execution_context["execution_mode"] == "REAL":
+        return await run_planned_test_case(
+            issue_key=issue_key,
+            summary=summary,
+            # The description is the prompt; fall back to the summary.
+            prompt_text=description_text or (summary or "").strip(),
+            test_definition=test_definition,
+            execution_context=execution_context,
+            tool_overridden=tool_overridden,
+            catalog_tool=catalog_tool,
+        )
+
     # print(f"{issue_key}: Starting ADK orchestrator")
 
     execution_mode = execution_context["execution_mode"]
@@ -265,7 +415,17 @@ async def process_single_issue(issue):
     if input_source == "TEST_CASE":
         # Summary and description are intentionally ignored.
         task_context["test_case_id"] = test_definition["test_case_id"]
-        task_context["test_case"] = test_definition
+        # Keep the catalog definition verbatim, except for the runner when the
+        # Jira text replaced it, so the prompt never states two different tools.
+        prompt_test_case = test_definition
+        if tool_overridden:
+            prompt_test_case = {**test_definition, "tool": requested_tool}
+            if isinstance(test_definition.get("workload_profile"), dict):
+                prompt_test_case["workload_profile"] = {
+                    **test_definition["workload_profile"],
+                    "tool": requested_tool,
+                }
+        task_context["test_case"] = prompt_test_case
         task_context["task_prompt"] = build_test_case_prompt(test_definition)
         source_instruction = (
             "The task is the task_prompt from the repository test case. "
@@ -332,6 +492,11 @@ async def process_single_issue(issue):
             + (
                 f"Test Case ID: {test_definition['test_case_id']}\n"
                 if test_definition else ""
+            ) +
+            (
+                f"Runner: {requested_tool} (selected in the Jira text; "
+                f"catalog default: {catalog_tool})\n"
+                if tool_overridden else ""
             ) +
             f"Requested task: {summary}\n\n"
             "Orchestrator-reported result:\n"
