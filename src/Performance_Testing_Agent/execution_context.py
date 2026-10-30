@@ -146,6 +146,7 @@ class ExecutionJobContext(BaseModel):
     execution_source_id: str | None = None
     test_case_id: str | None = None
     test_case_name: str | None = None
+    application: str | None = None
 
 
 class ExecutionJobResult(BaseModel):
@@ -780,6 +781,7 @@ def create_execution_job_context(
     source_id: str | None = None,
     test_case_id: str | None = None,
     test_case_name: str | None = None,
+    application: str | None = None,
     job_id: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(execution_mode, str):
@@ -832,6 +834,7 @@ def create_execution_job_context(
         execution_source_id=source_id,
         test_case_id=test_case_id,
         test_case_name=test_case_name,
+        application=application,
     )
     return context.model_dump(mode="json")
 
@@ -866,6 +869,11 @@ def create_context_for_test_case(
         test_case_name=(
             str(test_case["name"])
             if test_case.get("name") is not None
+            else None
+        ),
+        application=(
+            str(test_case["application"])
+            if test_case.get("application") is not None
             else None
         ),
     )
