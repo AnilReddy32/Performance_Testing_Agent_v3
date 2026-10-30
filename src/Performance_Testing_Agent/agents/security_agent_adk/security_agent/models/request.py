@@ -5,6 +5,7 @@ import re
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field
+from security_agent.passive.config import passive_assessment_enabled
 from security_agent.security.profiles import select_profile
 
 
@@ -161,6 +162,9 @@ class SecurityAssessmentRequest(BaseModel):
     assessment_mode: Literal["configuration_only", "configuration_and_live"] = "configuration_only"
     live_testing_requested: bool = False
     live_testing_authorized: bool = False
+    # True when the passive external-surface assessment applies: always for the
+    # automatic assessment, and for an explicit request that did not opt out.
+    passive_assessment_requested: bool = False
 
 
 class SecurityRequest(BaseModel):
@@ -176,14 +180,18 @@ class SecurityRequest(BaseModel):
 def build_security_assessment_request(
     objective: str,
     session_state: dict[str, Any],
+    *,
+    auto_passive: bool = False,
 ) -> SecurityAssessmentRequest:
     """Build the contract from the objective and trusted execution state.
 
     Target identity comes only from the workload profile in session state;
     prose in the objective cannot replace the active job's target.
-    A general security request may request one bounded external surface
-    observation. Runtime authorization is still subject to the deployment
-    kill switch and exact trusted job scope in the live-test tool.
+    A general security request may request the bounded passive external-surface
+    assessment (or, when that is switched off, one bounded HEAD observation
+    that is still subject to the live-test kill switch and exact job scope).
+    ``auto_passive`` marks the automatic assessment of a REAL run: it assesses
+    only the external surface, whatever the objective says.
     """
 
     profile = session_state.get("workload_profile")
@@ -219,6 +227,16 @@ def build_security_assessment_request(
         # external surface instead of claiming scope over internal controls.
         controls = ["external_surface"]
     live_requested = is_explicit_live_security_request(objective)
+    passive_requested = False
+    if auto_passive:
+        # The automatic assessment never widens to configuration controls; only
+        # an explicit security request does that.
+        controls, controls_source = ["external_surface"], "overall_security_default"
+        passive_requested = passive_assessment_enabled()
+    elif live_requested and passive_assessment_enabled():
+        passive_requested = True
+    # A passive observation is a live observation of the target.
+    live_requested = live_requested or passive_requested
     if live_requested and "external_surface" not in controls:
         controls.append("external_surface")
     test_case_id = session_state.get("test_case_id")
@@ -271,4 +289,5 @@ def build_security_assessment_request(
         assessment_mode="configuration_and_live" if live_requested else "configuration_only",
         live_testing_requested=live_requested,
         live_testing_authorized=False,
+        passive_assessment_requested=passive_requested,
     )

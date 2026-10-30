@@ -16,6 +16,129 @@ _SECURITY_NEGATION = re.compile(
     r"\b(?:do not|don't|without|skip)\s+(?:run\s+)?security\b",
     re.IGNORECASE,
 )
+# The automatic passive assessment is on by default; the text can opt out. The
+# wording rules mirror jira_agent_integration.stage_plan so both entry points
+# read a refusal the same way.
+_SECURITY_WORD = re.compile(
+    r"\b(?:security|vulnerabilit\w*|penetration|pen[- ]?test\w*|owasp|sql injection)\b",
+    re.IGNORECASE,
+)
+_NEGATION_WORDS = {
+    "not", "don't", "dont", "never", "skip", "skipping", "without",
+    "exclude", "excluding", "avoid", "no", "omit", "omitting",
+    "ignore", "ignoring", "disable", "disabling",
+}
+# "don't forget security", "do not miss the security checks": a negation that
+# asks for the opposite of a refusal.
+_REVERSING_WORDS = {
+    "forget", "forgetting", "miss", "overlook", "neglect",
+    "problem", "problems", "issue", "issues", "doubt", "worries",
+}
+_LEAVE_OUT = re.compile(r"\bleave\s+out\b", re.IGNORECASE)
+_NOT_NEEDED_AFTER = re.compile(
+    r"\b(?:is\s+not|isn't|not)\s+(?:required|needed|necessary|wanted)\b|\bunnecessary\b"
+    r"|\b(?:out\s+of\s+scope|disabled|skipped|excluded|off)\b"
+    r"|\bnot\s+this\s+time\b|[:\-]\s*(?:skip|off|no|none)\b",
+    re.IGNORECASE,
+)
+_CLAUSE_SPLIT = re.compile(r"[.!?;\n,]+")
+# Result keys the Analysis step may drop when it re-types the security result.
+_SECURITY_CHECK_KEYS = ("check_results", "check_summary", "assessment_outcome")
+
+# Takes the pipeline state and returns a complete security result for the
+# current job, or None when an automatic assessment does not apply to it.
+PassiveSecurity = Callable[[MutableMapping[str, Any]], Awaitable["dict[str, Any] | None"]]
+
+
+def _refused_mentions(user_query: str) -> list[bool]:
+    """One flag per security keyword in the text: is that mention a refusal?"""
+    flags: list[bool] = []
+    for clause in _CLAUSE_SPLIT.split(user_query or ""):
+        for match in _SECURITY_WORD.finditer(clause):
+            before = clause[: match.start()]
+            nearby = re.findall(r"[\w']+", before.lower())[-6:]
+            negations = sum(word in _NEGATION_WORDS for word in nearby) + bool(
+                _LEAVE_OUT.search(before[-24:])
+            )
+            refused_before = negations == 1 and not set(nearby) & _REVERSING_WORDS
+            refused_after = bool(_NOT_NEEDED_AFTER.search(clause[match.end():]))
+            flags.append(refused_before or refused_after)
+    return flags
+
+
+def security_opted_out(user_query: str) -> bool:
+    """True when the request text asks for security to be skipped.
+
+    The explicit forms ("do not run security", "skip security", "without
+    security") always opt out. Other wordings ("no penetration testing",
+    "security: skip", "omit security") opt out only when every security mention
+    in the text is a refusal, so "assess the security surface but skip the
+    vulnerability scan" still asks for security.
+    """
+    if _SECURITY_NEGATION.search(user_query or ""):
+        return True
+    flags = _refused_mentions(user_query)
+    return bool(flags) and all(flags)
+
+
+def _security_ran_too_early(result: dict | None) -> bool:
+    """True for a security result blocked because the performance run had not ended."""
+    if not isinstance(result, dict):
+        return False
+    live = result.get("live_test_result")
+    live = live if isinstance(live, dict) else {}
+    return live.get("reason_code") == "run_not_finished" or (
+        "only after the performance execution has ended" in str(live.get("reason", ""))
+    )
+
+
+def _security_for_prompt(security_result: object) -> object:
+    """The model needs the verdict, not every check's raw evidence to re-type."""
+    if isinstance(security_result, dict) and "check_results" in security_result:
+        return {k: v for k, v in security_result.items() if k != "check_results"}
+    return security_result
+
+
+def _restore_security_checks(
+    analysis: dict[str, Any], state: MutableMapping[str, Any], job_id: str
+) -> None:
+    """Carry the per-check verdicts into the analysis exactly as the agent produced them.
+
+    The Analysis agent re-types the security result, so the pipeline puts the
+    authoritative check fields back rather than trusting the copy. Results
+    without per-check verdicts are left exactly as they were.
+    """
+    current = json_object(state.get("security_result"))
+    if (
+        current is None
+        or current.get("job_id") != job_id
+        or not isinstance(current.get("check_results"), list)
+    ):
+        return
+    summary = analysis.get("security_summary")
+    if not isinstance(summary, dict):
+        try:
+            from Performance_Testing_Agent.agents.Analysis_Report_agent_adk.app.agents.analysis.tools import (
+                summarize_security,
+            )
+
+            rebuilt = summarize_security(current, job_id)
+        except Exception:
+            logger.exception("Could not rebuild the security summary for the analysis")
+            return
+        if rebuilt:
+            analysis["security_summary"] = rebuilt
+            if (
+                str(rebuilt.get("status", "")).upper() == "FAIL"
+                and analysis.get("overall_status") != "fail"
+            ):
+                analysis["overall_status"] = "fail"
+        return
+    if summary.get("job_id") != job_id:
+        return
+    for key in _SECURITY_CHECK_KEYS:
+        if key in current:
+            summary[key] = current[key]
 
 
 def json_object(value: object) -> dict | None:
@@ -34,6 +157,55 @@ def json_object(value: object) -> dict | None:
     return parsed if isinstance(parsed, dict) else None
 
 
+async def _run_automatic_security(
+    *,
+    state: MutableMapping[str, Any],
+    user_query: str,
+    job_id: str,
+    execution_status: object,
+    passive_security: PassiveSecurity | None,
+    persist_state: Callable[[dict[str, Any]], Awaitable[None]] | None,
+    analysis_ready: bool = False,
+) -> str:
+    """Run the model-free passive assessment for a run that did not ask for security.
+
+    Returns the pipeline stage status. Nothing is sent unless every condition
+    holds: an assessor was supplied, the run ended, the text does not opt out,
+    and the assessor itself finds an external HTTPS API target.
+    """
+    skipped = "skipped: not requested"
+    if (
+        passive_security is None
+        or execution_status not in {"completed", "failed"}
+        or security_opted_out(user_query)
+    ):
+        return skipped
+    if analysis_ready:
+        # Analysis (and so the report) already exist without security; a late scan
+        # could not reach them, so nothing is sent.
+        return "skipped: analysis was already produced for this job"
+    existing = json_object(state.get("security_result"))
+    if existing is not None and existing.get("job_id") == job_id:
+        state["security_result"] = existing
+        return "already_available"
+    try:
+        result = await passive_security(state)
+    except Exception as exc:  # security must never stop analysis or the report
+        logger.exception("Automatic passive security assessment failed")
+        return f"failed: {type(exc).__name__}: {exc}"
+    if result is None:
+        return skipped
+    if not isinstance(result, dict) or result.get("job_id") != job_id:
+        return "missing_result"
+    state["security_result"] = result
+    if persist_state is not None:
+        try:
+            await persist_state({"security_result": result})
+        except Exception:
+            logger.exception("Could not persist the automatic security result")
+    return "completed (automatic passive assessment)"
+
+
 async def complete_real_k6_pipeline(
     *,
     state: MutableMapping[str, Any],
@@ -47,6 +219,7 @@ async def complete_real_k6_pipeline(
     persist_state: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
     monitoring_requested: bool | None = None,
     security_requested: bool | None = None,
+    passive_security: PassiveSecurity | None = None,
 ) -> dict[str, str] | None:
     """Fill missing downstream stages for terminal REAL k6 and JMeter jobs.
 
@@ -56,7 +229,10 @@ async def complete_real_k6_pipeline(
 
     monitoring_requested / security_requested let a caller that has already
     planned its stages decide them explicitly. None keeps the default: monitor
-    every completed run, and run security only when the query asks for it.
+    every completed run, and run the full security agent when the query asks
+    for it. A run that did not ask for security still gets the automatic
+    passive assessment when ``passive_security`` is supplied, the target is an
+    external API, and the text does not opt out.
     """
     profile = state.get("workload_profile")
     tool = profile.get("tool") if isinstance(profile, dict) else None
@@ -133,10 +309,15 @@ async def complete_real_k6_pipeline(
     else:
         pipeline["monitoring"] = "skipped: execution was not completed"
 
+    if _security_ran_too_early(json_object(state.get("security_result"))):
+        # It was blocked only because it started while the test was still running.
+        # The run has ended now, so that result is not the answer: assess again.
+        logger.info("Discarding a security result produced before the run ended.")
+        state["security_result"] = None
     if security_requested is None:
-        security_requested = bool(_SECURITY_REQUEST.search(user_query)) and not bool(
-            _SECURITY_NEGATION.search(user_query)
-        )
+        security_requested = bool(
+            _SECURITY_REQUEST.search(user_query)
+        ) and not security_opted_out(user_query)
     if security_requested:
         await invoke_if_missing(
             "security",
@@ -148,7 +329,17 @@ async def complete_real_k6_pipeline(
             current_job_required=True,
         )
     else:
-        pipeline["security"] = "skipped: not requested"
+        pipeline["security"] = await _run_automatic_security(
+            state=state,
+            user_query=user_query,
+            job_id=job_id,
+            execution_status=execution_status,
+            passive_security=passive_security,
+            persist_state=persist_state,
+            analysis_ready=(
+                (json_object(state.get("analysis_result")) or {}).get("job_id") == job_id
+            ),
+        )
 
     execution_stage = json_object(state.get("execution_stage_result")) or {}
     execution_artifacts = state.get("execution_artifacts")
@@ -183,16 +374,35 @@ async def complete_real_k6_pipeline(
         ),
         "execution_artifacts": artifact_values,
     }
+    # An automatic scan that could assess nothing (target blocked, DNS failure, every
+    # check inconclusive) must not make an otherwise clean run look worse: Analysis
+    # is not shown it. The result is still attached for the report to display.
+    automatic_but_unassessed = (
+        pipeline.get("security", "").startswith("completed (automatic")
+        and isinstance(analysis_inputs["security_result"], dict)
+        and analysis_inputs["security_result"].get("assessment_outcome") == "not_assessed"
+    )
     await invoke_if_missing(
         "analysis",
         analysis_agent,
         "Analyze the current job using its current test_execution_result, "
-        "monitoring_result, execution_stage_result, and any explicitly "
-        "requested security_result shown below. Use only evidence for this "
+        "monitoring_result, execution_stage_result, and any security_result "
+        "shown below. Use only evidence for this "
         "job. If execution failed or metrics are absent, preserve the failure "
         "as unavailable/invalid data and do not invent measurements. Follow "
         "your tool sequence and return structured analysis. Current-job "
-        "inputs: " + json.dumps(analysis_inputs, separators=(",", ":"), default=str),
+        "inputs: " + json.dumps(
+            {
+                **analysis_inputs,
+                "security_result": (
+                    None
+                    if automatic_but_unassessed
+                    else _security_for_prompt(analysis_inputs["security_result"])
+                ),
+            },
+            separators=(",", ":"),
+            default=str,
+        ),
         "analysis_result",
     )
 
@@ -207,6 +417,8 @@ async def complete_real_k6_pipeline(
         if analysis["security_summary"].get("job_id") != job_id:
             logger.warning("Ignoring Analysis security_summary with a mismatched job_id")
             analysis["security_summary"] = None
+    if analysis is not None:
+        _restore_security_checks(analysis, state, job_id)
 
     terminal_analysis_unusable = (
         analysis is None

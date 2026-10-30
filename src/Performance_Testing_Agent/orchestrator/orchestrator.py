@@ -2,6 +2,7 @@ import os
 import uuid
 from pathlib import Path
 
+from google.adk.events import Event, EventActions
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
@@ -27,6 +28,7 @@ from Performance_Testing_Agent.artifact_store import (
 from .agent import (
     analysis_agent,
     monitoring_agent,
+    passive_security_assessor,
     report_agent,
     root_agent,
     security_agent,
@@ -132,7 +134,17 @@ class Orchestrator:
                 session_id=session_id,
             )
             if session is not None:
-                session.state.update(values)
+                # get_session returns a copy, so updating session.state in place
+                # is lost. An event carrying a state delta is how stored state
+                # is changed; later agents (Report reads {analysis_result}) and
+                # the pipeline's own refresh then see these values.
+                await self.session_service.append_event(
+                    session,
+                    Event(
+                        author="pipeline",
+                        actions=EventActions(state_delta=dict(values)),
+                    ),
+                )
 
         pipeline = await complete_real_k6_pipeline(
             state=state,
@@ -146,6 +158,7 @@ class Orchestrator:
             persist_state=persist_state,
             monitoring_requested=monitoring_requested,
             security_requested=security_requested,
+            passive_security=passive_security_assessor,
         )
         return (state, pipeline) if pipeline is not None else None
 

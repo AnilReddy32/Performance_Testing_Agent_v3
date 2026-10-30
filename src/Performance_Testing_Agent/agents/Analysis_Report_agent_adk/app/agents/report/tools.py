@@ -67,6 +67,30 @@ def _format_count(value) -> str:
         return str(value)
 
 
+def _passive_check_lines(security_summary: dict) -> list:
+    """One line per passive check verdict, with the totals; empty when none ran."""
+    check_results = security_summary.get("check_results")
+    if not isinstance(check_results, list) or not check_results:
+        return []
+    totals = security_summary.get("check_summary")
+    totals = totals if isinstance(totals, dict) else {}
+    lines = [
+        "Passive external-surface checks "
+        f"({totals.get('assessed', '?')} of {totals.get('total', len(check_results))} assessed; "
+        f"{totals.get('passed', '?')} passed, {totals.get('failed', '?')} failed, "
+        f"{totals.get('inconclusive', '?')} inconclusive; "
+        f"outcome: {security_summary.get('assessment_outcome', 'unknown')}):"
+    ]
+    for item in check_results:
+        if isinstance(item, dict):
+            lines.append(
+                f"  - [{str(item.get('verdict', 'unknown')).upper()}] "
+                f"{item.get('title', item.get('check_id', 'check'))} "
+                f"({item.get('severity', 'unknown')}): {item.get('summary', '')}"
+            )
+    return lines
+
+
 def _display_live_security_status(security_summary: Optional[dict]) -> str:
     """Map internal live-check states to the four report-facing labels."""
     if not security_summary:
@@ -193,6 +217,9 @@ def _build_agent_activity_rows(
                         + "; basis=" + str(item.get("assessment_basis", "not stated"))
                         + "; evidence=" + str(item.get("evidence_references", []))
                     )
+        # The summary table gets the totals only; the full per-check list is in
+        # the "Security Findings" section.
+        sec_lines.extend(line.rstrip(":") for line in _passive_check_lines(security_summary)[:1])
         if security_summary.get("evidence_references"):
             sec_lines.append(
                 "Evidence references: " + ", ".join(map(str, security_summary["evidence_references"]))
@@ -728,6 +755,7 @@ def build_report_sections(
                         refs=item.get("evidence_references", []),
                     )
                 )
+        lines.extend(_passive_check_lines(security_summary))
         if security_summary.get("evidence_references"):
             lines.append("Evidence references: " + ", ".join(map(str, security_summary["evidence_references"])))
         live_result = security_summary.get("live_test_result")

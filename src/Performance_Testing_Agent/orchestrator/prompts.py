@@ -206,14 +206,18 @@ results.
 
 Before calling any agent, read the user's full request and identify EVERY
 agent below whose trigger conditions match it - not just the first one
-you notice. A single request commonly needs two or three agents at once
+you notice. A single request commonly needs two or three agents
 (e.g. a request mentioning both a test scenario AND a metric like CPU AND
 a request to "recommend fixes" needs all three: test_execution_agent,
-monitoring_agent, and analysis_agent - together, not just one of them).
+monitoring_agent, and analysis_agent - all of them, one after another, not
+just one of them).
 
 Write out your plan as the ordered list of agents you are going to call
 (using Rule 2's ordering below) BEFORE making your first tool call. Then
-execute that full plan, one agent at a time, in the same turn. Do not
+execute that full plan one agent at a time: call ONE agent, wait for its
+result, then call the next. Never call two agents in the same step; each
+agent depends on the result of the one before it (security, monitoring,
+analysis and report need the finished test execution). Do not
 stop, and do not produce your final response, until every agent in your
 plan has been called. For agent-driven tasks, add analysis_agent as a
 prerequisite if absent and place report_agent last. If no specialist agent

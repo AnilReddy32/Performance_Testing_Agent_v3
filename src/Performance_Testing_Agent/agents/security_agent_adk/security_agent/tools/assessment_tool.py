@@ -12,6 +12,7 @@ from security_agent.security.assessment import (
     build_security_response,
     update_conflicts,
 )
+from security_agent.passive.service import run_passive_checks
 from security_agent.security.evaluation import evaluate_configured_controls
 from security_agent.security.profiles import select_profile
 from security_agent.tools.state_utils import snapshot_session_state
@@ -31,6 +32,8 @@ def get_security_assessment_context(
     # Security assessments can be repeated for the same performance job.
     # Clear any previous observation so finalization cannot reuse stale data.
     tool_context.state["security_live_test_result"] = None
+    tool_context.state["security_passive_result"] = None
+    tool_context.state["security_result_fresh"] = False
     return request.model_dump(mode="json")
 
 
@@ -174,13 +177,17 @@ def finalize_assessment(
         or live_result.get("method") != "HEAD"
     ):
         live_result = None
+    passive_result = session_state.get("security_passive_result")
     result = build_security_response(
         state,
         evaluation=evaluation,
         live_result=live_result,
+        passive_result=passive_result if isinstance(passive_result, dict) else None,
     ).model_dump(mode="json")
 
     tool_context.state["security_result"] = result
+    # Marks this run's result as the one the agent must answer with verbatim.
+    tool_context.state["security_result_fresh"] = True
 
     return result
 
@@ -201,7 +208,16 @@ async def finalize_assessment_with_live_observation(
         objective=assessment.objective,
         session_state=session_state,
     )
-    live_result = session_state.get("security_live_test_result")
-    if request.live_testing_requested and not isinstance(live_result, dict):
-        await execute_authorized_live_test(assessment.objective, tool_context)
+    if request.passive_assessment_requested:
+        # The passive assessment is deterministic and replaces the single HEAD
+        # observation; run it here so it cannot be skipped by the model.
+        existing = session_state.get("security_passive_result")
+        if not (isinstance(existing, dict) and existing.get("job_id") == request.job_id):
+            tool_context.state["security_passive_result"] = await run_passive_checks(
+                session_state
+            )
+    else:
+        live_result = session_state.get("security_live_test_result")
+        if request.live_testing_requested and not isinstance(live_result, dict):
+            await execute_authorized_live_test(assessment.objective, tool_context)
     return finalize_assessment(state_data, tool_context)

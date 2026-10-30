@@ -27,6 +27,7 @@ if str(_SECURITY_ADK_ROOT) not in sys.path:
 from app.agent import root_agent as test_execution_agent
 
 from security_agent.config import settings
+from security_agent.passive import assess_external_surface as passive_security_assessor
 
 from ..agents.security_agent_adk.security_agent.agent import root_agent as security_agent
 
@@ -35,6 +36,7 @@ from ..agents.monitoring_agent_adk.app.agent import monitoring_agent
 from ..agents.Analysis_Report_agent_adk.app.agents.analysis.agent import analysis_agent
 from ..agents.Analysis_Report_agent_adk.app.agents.report.agent import report_agent
 
+from .flow import one_stage_at_a_time
 from .prompts import ORCHESTRATOR_SYSTEM_PROMPT
 from .pipeline import complete_real_k6_pipeline, json_object
 from .tools import (
@@ -43,6 +45,18 @@ from .tools import (
     record_test_case_prompt,
 )
 
+
+# The only order the stages may run in. The first two are the quick setup tools
+# that must finish before anything is planned or executed.
+STAGE_ORDER = [
+    "record_test_case_prompt",
+    "load_catalog_test_case",
+    test_execution_agent.name,
+    monitoring_agent.name,
+    security_agent.name,
+    analysis_agent.name,
+    report_agent.name,
+]
 
 _PIPELINE_REQUEST = re.compile(
     r"\b(?:run|execute|monitor|analy[sz]e?|report|pdf|test case)\b|"
@@ -82,6 +96,7 @@ async def _complete_real_k6_pipeline_for_adk_web(
         security_agent=security_agent,
         analysis_agent=analysis_agent,
         report_agent=report_agent,
+        passive_security=passive_security_assessor,
     )
     if pipeline is None:
         return None
@@ -141,6 +156,8 @@ def build_orchestrator_agent() -> LlmAgent:
         instruction=ORCHESTRATOR_SYSTEM_PROMPT,
         before_agent_callback=bind_explicit_catalog_case,
         after_agent_callback=_complete_real_k6_pipeline_for_adk_web,
+        # One stage per turn, in the fixed order; see flow.py.
+        after_model_callback=one_stage_at_a_time(STAGE_ORDER),
         description=(
             "Orchestrates the test-execution, monitoring, security, "
             "analysis and reporting sub-agents for a banking application."

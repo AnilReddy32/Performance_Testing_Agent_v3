@@ -8,6 +8,7 @@ from google.adk.tools import ToolContext
 
 from security_agent.config import settings
 from security_agent.models.request import is_explicit_live_security_request
+from security_agent.passive.target import looks_like_external_https_target
 from security_agent.live_testing.executor import HTTPExecutor
 from security_agent.live_testing.models import (
     HTTPRequest,
@@ -82,6 +83,11 @@ async def execute_authorized_live_test(
 
     profile = state.get("workload_profile")
     profile = profile if isinstance(profile, dict) else {}
+    # A missing environment on a public HTTPS target is inferred as
+    # external_api instead of blocking the observation.
+    profile_environment = profile.get("environment") or (
+        "external_api" if looks_like_external_https_target(profile) else None
+    )
     target_url = profile.get("target_url")
     endpoint = profile.get("endpoint")
     if not isinstance(target_url, str) or not isinstance(endpoint, str):
@@ -92,7 +98,7 @@ async def execute_authorized_live_test(
         tool_context.state["security_live_test_result"] = result
         return result
 
-    scope_environment = settings.SECURITY_LIVE_ENVIRONMENT or profile.get("environment")
+    scope_environment = settings.SECURITY_LIVE_ENVIRONMENT or profile_environment
     if not isinstance(scope_environment, str) or not scope_environment.strip():
         result = _blocked("The live-test environment is not configured.", job_id=job_id)
         tool_context.state["security_live_test_result"] = result
@@ -122,13 +128,13 @@ async def execute_authorized_live_test(
         effective_port = origin.port or (443 if origin.scheme.lower() == "https" else 80)
         if (
             not settings.SECURITY_LIVE_ALLOWED_HOSTS
-            and profile.get("environment") != "external_api"
+            and profile_environment != "external_api"
         ):
             raise ValueError(
                 "targets outside the external_api environment require an explicit deployment host allowlist"
             )
         if (
-            profile.get("environment") == "external_api"
+            profile_environment == "external_api"
             and origin.scheme.lower() != "https"
         ):
             raise ValueError("external API surface checks require HTTPS")
@@ -143,7 +149,7 @@ async def execute_authorized_live_test(
             # validation pins the request to this exact path and query.
             endpoint=endpoint,
             method="HEAD",
-            environment=profile.get("environment"),
+            environment=profile_environment,
         )
     except (TypeError, ValueError) as exc:
         result = _blocked(f"The trusted target is invalid: {exc}", job_id=job_id)
@@ -207,7 +213,7 @@ async def execute_authorized_live_test(
             "target_origin": f"{origin.scheme.lower()}://{origin.netloc.lower()}",
             "endpoint": endpoint,
             "method": "HEAD",
-            "environment": profile.get("environment"),
+            "environment": profile_environment,
             "requests_sent": 1,
             "error": "The live security request exceeded its hard overall timeout.",
         }
@@ -223,7 +229,7 @@ async def execute_authorized_live_test(
         "target_origin": target_origin,
         "endpoint": endpoint,
         "method": "HEAD",
-        "environment": profile.get("environment"),
+        "environment": profile_environment,
         "requests_sent": 1,
         "response_status_code": response.status_code if response else None,
         "elapsed_ms": response.elapsed_ms if response else None,

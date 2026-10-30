@@ -1119,6 +1119,7 @@ def summarize_security(security_result: dict, job_id: str) -> dict | None:
         "assessed_controls", "not_assessed_controls", "coverage",
         "required_evidence_by_control", "control_results",
         "evidence_references", "limitations",
+        "assessment_outcome", "check_summary", "check_results",
     )
     summary = {
         "status": security_result.get("status", "unknown"),

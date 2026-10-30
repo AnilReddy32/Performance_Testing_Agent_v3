@@ -4,11 +4,18 @@ import tempfile
 from pathlib import Path
 
 from app.tools.artifact_generator import ArtifactGenerator
-from app.tools.jmeter_template import build_real_jmeter_plan
+from app.tools.jmeter_template import (
+    build_real_jmeter_plan,
+    validate_real_jmeter_plan,
+)
 from app.tools.k6_template import build_real_k6_script
+from app.tools.script_library import reuse_or_build
 from Performance_Testing_Agent.execution_context import (
+    WorkloadProfile,
     artifact_root_directory,
+    missing_profile_inputs,
     resolve_artifact_directory,
+    validate_real_profile,
     workload_profile_from_test_case,
 )
 
@@ -16,6 +23,33 @@ from Performance_Testing_Agent.execution_context import (
 GENERATED_SCRIPTS_DIR = str(
     Path(__file__).resolve().parents[5] / "generated_scripts"
 )
+
+
+def _reuse_message(kind: str, test_case_id) -> str:
+    """Say plainly that nothing was regenerated, so a reused script is not mistaken for a new one."""
+    subject = f"for {test_case_id} " if test_case_id else ""
+    return (
+        f"Reviewed REAL {kind} {subject}reused from the stored script (the workload is "
+        "unchanged, so it was not regenerated) and copied into the job artifact directory."
+    )
+
+
+def _verify_reused_k6_script(profile_data: dict) -> None:
+    """Re-run the checks build_real_k6_script applies before it renders.
+
+    A stored k6 script is only reused if the profile still passes the same
+    validation and safety preflight (host allowlist, limits) as a fresh build.
+    Raises ValueError otherwise, and the caller then builds normally.
+    """
+    profile = WorkloadProfile.model_validate(profile_data)
+    if profile.tool != "k6":
+        raise ValueError("The real k6 template requires tool='k6'.")
+    missing = missing_profile_inputs(profile)
+    if missing:
+        raise ValueError("The real k6 workload profile is missing: " + ", ".join(missing))
+    preflight = validate_real_profile(profile)
+    if preflight["status"] != "ready":
+        raise ValueError("Real k6 script generation failed safety preflight.")
 
 
 def generate_script(
@@ -104,9 +138,20 @@ def generate_script(
                         "The supplied artifact directory does not match this job."
                     )
 
-                script_content = build_real_jmeter_plan(
-                    profile.model_dump(mode="json"),
-                    test_case_id=test_case_id,
+                profile_data = profile.model_dump(mode="json")
+                script_content, script_source = reuse_or_build(
+                    "jmeter",
+                    profile_data,
+                    test_case_id,
+                    build=lambda: build_real_jmeter_plan(
+                        profile_data,
+                        test_case_id=test_case_id,
+                    ),
+                    verify=lambda content: validate_real_jmeter_plan(
+                        content,
+                        profile_data,
+                        test_case_id,
+                    ),
                 )
                 safe_test_case_id = _sanitize_filename(test_case_id or "")[:64]
                 filename_part = safe_test_case_id or "api_test"
@@ -149,8 +194,12 @@ def generate_script(
             return {
                 "status": "success",
                 "message": (
-                    "Reviewed REAL JMeter plan generated from the trusted "
-                    "workload profile and saved in the job artifact directory."
+                    _reuse_message("JMeter plan", test_case_id)
+                    if script_source == "reused"
+                    else (
+                        "Reviewed REAL JMeter plan generated from the trusted "
+                        "workload profile and saved in the job artifact directory."
+                    )
                 ),
                 "tool": tool,
                 "application": application,
@@ -161,6 +210,7 @@ def generate_script(
                 "file_name": file_name,
                 "file_path": str(script_path),
                 "artifact_path": file_name,
+                "script_source": script_source,
             }
 
         if tool != "k6":
@@ -203,9 +253,16 @@ def generate_script(
                 raise ValueError(
                     "The supplied artifact directory does not match this job."
                 )
-            script_content = build_real_k6_script(
-                profile.model_dump(mode="json"),
-                test_case_id=test_case_id,
+            profile_data = profile.model_dump(mode="json")
+            script_content, script_source = reuse_or_build(
+                "k6",
+                profile_data,
+                test_case_id,
+                build=lambda: build_real_k6_script(
+                    profile_data,
+                    test_case_id=test_case_id,
+                ),
+                verify=lambda content: _verify_reused_k6_script(profile_data),
             )
         except ValueError as exc:
             return {
@@ -237,7 +294,11 @@ def generate_script(
         script_path.write_text(script_content, encoding="utf-8")
         return {
             "status": "success",
-            "message": "Reviewed REAL k6 script generated from workload profile.",
+            "message": (
+                _reuse_message("k6 script", test_case_id)
+                if script_source == "reused"
+                else "Reviewed REAL k6 script generated from workload profile."
+            ),
             "tool": tool,
             "application": application,
             "scenario": scenario,
@@ -247,6 +308,7 @@ def generate_script(
             "file_name": script_path.name,
             "file_path": str(script_path),
             "artifact_path": script_path.name,
+            "script_source": script_source,
         }
 
     if execution_mode != "SIMULATED":

@@ -10,6 +10,10 @@ from security_agent.config import settings
 from security_agent.tools.api_tool import get_api_information
 from security_agent.tools.profile_tool import get_application_profile
 from security_agent.tools.live_test_tool import execute_authorized_live_test
+from security_agent.tools.trusted_response import (
+    reset_trusted_result,
+    use_trusted_result,
+)
 from security_agent.tools.assessment_tool import (
     create_assessment_state,
     evaluate_configured_security_controls,
@@ -66,6 +70,10 @@ security_operations_agent = LlmAgent(
         create_assessment_state,
         finalize_assessment_with_live_observation,
     ],
+    # The finalization tool's result is deterministic; do not let the model's
+    # re-typed copy (which can drop fields) be the final answer.
+    before_agent_callback=reset_trusted_result,
+    after_model_callback=use_trusted_result,
 )
 
 
@@ -83,6 +91,8 @@ root_agent = LlmAgent(
         "or added commentary. Do not call any other tool."
     ),
     tools=[AgentTool(agent=security_operations_agent)],
+    before_agent_callback=reset_trusted_result,
+    after_model_callback=use_trusted_result,
 )
 
 

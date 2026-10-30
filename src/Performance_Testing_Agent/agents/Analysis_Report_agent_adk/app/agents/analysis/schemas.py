@@ -70,6 +70,9 @@ class SecurityResult(BaseModel):
     assessment_mode: Optional[str] = None
     live_testing_requested: bool = False
     live_testing_status: Optional[str] = None
+    assessment_outcome: Optional[str] = None
+    check_summary: dict[str, Any] = Field(default_factory=dict)
+    check_results: List[dict[str, Any]] = Field(default_factory=list)
     requested_controls: List[str] = Field(default_factory=list)
     assessed_controls: List[str] = Field(default_factory=list)
     not_assessed_controls: List[str] = Field(default_factory=list)
@@ -147,6 +150,9 @@ class SecuritySummary(BaseModel):
     live_testing_requested: bool = False
     live_testing_status: str = "not_requested"  # completed | failed | not_requested | not_assessed
     live_test_result: Optional[dict[str, Any]] = None
+    assessment_outcome: Optional[str] = None  # assessed | partially_assessed | not_assessed
+    check_summary: dict[str, Any] = Field(default_factory=dict)
+    check_results: List[dict[str, Any]] = Field(default_factory=list)  # one verdict per passive check
     requested_controls: List[str] = Field(default_factory=list)
     assessed_controls: List[str] = Field(default_factory=list)
     not_assessed_controls: List[str] = Field(default_factory=list)

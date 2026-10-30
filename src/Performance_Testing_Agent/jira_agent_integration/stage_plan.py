@@ -7,8 +7,10 @@ only through the fixed keyword rules below; it is never executed or trusted.
 Stages, always in this order:
     execution -> monitoring -> security -> analysis -> report
 Execution, analysis and report are the main stages. Monitoring runs by default
-(as it does for every real run) unless the text says to skip it. Security runs
-only when the text asks for it.
+(as it does for every real run) unless the text says to skip it. The full
+security assessment runs when the text asks for it; a run against an external
+HTTPS target also gets the automatic passive security check unless the text
+opts out (see orchestrator.pipeline).
 """
 
 import re
@@ -115,7 +117,11 @@ def build_stage_plan(prompt_text: str, *, test_case_id: str) -> StagePlan:
 
     security_asked, _ = _mentions(_SECURITY, text)
     if not security_asked:
-        notes.append("Security assessment not requested in the text; skipped.")
+        notes.append(
+            "Security assessment not requested in the text; the automatic passive "
+            "security check still runs for external HTTPS targets (write 'skip "
+            "security' to opt out)."
+        )
 
     other_ids = sorted(
         {m.group(0).upper() for m in _CASE_ID.finditer(text)} - {test_case_id.upper()}

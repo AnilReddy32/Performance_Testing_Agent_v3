@@ -303,6 +303,33 @@ def is_jmeter_test_request(request: str) -> bool:
     return bool(_JMETER_TASK_PATTERN.search(request))
 
 
+_TOOL_NEGATION = re.compile(
+    r"\b(?:not|no|never|without|avoid|except|excluding|skip|don't|dont|"
+    r"instead\s+of|rather\s+than)\b",
+    re.IGNORECASE,
+)
+
+
+def _only_named_tool(request: str) -> str | None:
+    """The one runner a request names, if it names exactly one without negating it.
+
+    Whatever runner the prompt names is the runner used, whatever the catalog
+    case defaults to. The explicit phrasings in requested_execution_tool ("using
+    JMeter", "k6 runner") are narrower than the ways people name a runner, so
+    "Run PTC-003 in JMeter", "using Apache JMeter" or just "PTC-003 JMeter" left
+    the case on its catalog tool (and a JMeter request was then blocked for a
+    tool mismatch). A negated mention ("no JMeter") does not count. Two runners
+    named, or none, stay unselected.
+    """
+    named = {
+        tool
+        for tool, name in (("k6", "k6"), ("jmeter", "jmeter"))
+        for match in re.finditer(rf"\b{name}\b", request, re.IGNORECASE)
+        if not _TOOL_NEGATION.search(request[max(0, match.start() - 40): match.start()])
+    }
+    return next(iter(named)) if len(named) == 1 else None
+
+
 def requested_execution_tool(request: str) -> str | None:
     """Return an explicitly requested real runner, if the request names one."""
     k6_selected = bool(
@@ -333,7 +360,7 @@ def requested_execution_tool(request: str) -> str | None:
         raise ValueError(
             "Select either k6 or JMeter for one test case execution."
         )
-    return next(iter(requested), None)
+    return next(iter(requested), None) or _only_named_tool(request)
 
 
 def is_explicit_execution_request(request: str) -> bool:

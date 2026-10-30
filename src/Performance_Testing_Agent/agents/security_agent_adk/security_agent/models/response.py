@@ -81,6 +81,11 @@ class SecurityResponse(BaseModel):
         "not_requested", "not_run", "blocked", "completed", "failed"
     ] = "not_requested"
     live_test_result: dict[str, Any] | None = None
+    # Passive external-surface assessment: one verdict per check. They stay
+    # empty/None for results that did not run it (for example configuration-only).
+    assessment_outcome: Literal["assessed", "partially_assessed", "not_assessed"] | None = None
+    check_summary: dict[str, Any] = Field(default_factory=dict)
+    check_results: list[dict[str, Any]] = Field(default_factory=list)
     requested_controls: list[str] = Field(default_factory=list)
     requested_controls_source: Literal[
         "explicit_request", "overall_security_default", "no_control_selected"

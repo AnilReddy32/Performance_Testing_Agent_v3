@@ -177,6 +177,7 @@ def build_security_response(
     *,
     evaluation: dict[str, Any] | None = None,
     live_result: dict[str, Any] | None = None,
+    passive_result: dict[str, Any] | None = None,
 ) -> SecurityResponse:
     """
     Convert internal assessment state into the external
@@ -188,7 +189,7 @@ def build_security_response(
 
     request = state.request_context
     if request is not None and evaluation is not None:
-        return _build_evaluated_response(request, evaluation, live_result)
+        return _build_evaluated_response(request, evaluation, live_result, passive_result)
 
     if request and request.profile_match_status != "matched":
         # Never allow evidence from a non-matching application profile to be
@@ -322,16 +323,127 @@ def build_security_response(
     )
 
 
+_SEVERITY_ORDER = ("critical", "high", "medium", "low")
+
+
+def _current_passive_result(
+    request: SecurityAssessmentRequest, passive_result: dict[str, Any] | None
+) -> dict[str, Any] | None:
+    """Accept a passive result only if it was produced for this very job."""
+    if (
+        request.passive_assessment_requested
+        and isinstance(passive_result, dict)
+        and passive_result.get("job_id") == request.job_id
+    ):
+        return passive_result
+    return None
+
+
+def _passive_control_result(
+    request: SecurityAssessmentRequest, passive: dict[str, Any]
+) -> dict[str, Any]:
+    """The external_surface control, judged only from the assessed passive checks."""
+    checks = [c for c in passive.get("check_results", []) if isinstance(c, dict)]
+    assessed = [c for c in checks if c.get("verdict") in {"passed", "failed"}]
+    failed = [c for c in assessed if c.get("verdict") == "failed"]
+    reference = f"passive-assessment:{request.job_id}"
+    required = [
+        "passive observations of TLS, response headers, CORS, redirect, "
+        "error handling, methods and the run's own traffic"
+    ]
+    if passive.get("status") != "completed" or not assessed:
+        reason = passive.get("reason") or (
+            "Every passive check was inconclusive: "
+            + "; ".join(str(c.get("summary")) for c in checks[:3])
+        )
+        return {
+            "control": "external_surface",
+            "assessment_status": "not_assessed",
+            "assessment_basis": "live_observation",
+            "status": "WARNING",
+            "security_score": "N/A",
+            "severity": "unknown",
+            "required_evidence": required,
+            "available_evidence": {},
+            "missing_evidence": [str(reason)],
+            "issues": ["The passive external-surface assessment could not assess any check."],
+            "recommendations": [],
+            "evidence_references": [],
+        }
+    severities = {str(c.get("severity")) for c in failed}
+    worst = next((s for s in _SEVERITY_ORDER if s in severities), "low")
+    return {
+        "control": "external_surface",
+        "assessment_status": "assessed",
+        "assessment_basis": "live_observation",
+        "status": passive.get("status_rollup", "WARNING"),
+        "security_score": passive.get("security_score", "N/A"),
+        "security_score_basis": passive.get("security_score_basis", ""),
+        "severity": worst,
+        "required_evidence": required,
+        "available_evidence": {str(c.get("check_id")): c.get("verdict") for c in assessed},
+        "missing_evidence": [],
+        "issues": [
+            f"[{c.get('severity')}] {c.get('title')}: {c.get('summary')}" for c in failed
+        ],
+        "recommendations": list(
+            dict.fromkeys(str(c["recommendation"]) for c in failed if c.get("recommendation"))
+        ),
+        "evidence_references": [reference],
+    }
+
+
+def _passive_live_summary(passive: dict[str, Any]) -> dict[str, Any]:
+    """Map the passive result onto the live-observation fields consumers read."""
+    status = passive.get("status")
+    live_status = "completed" if status == "completed" else "blocked"
+    summary = {
+        "status": live_status,
+        "authorized": passive.get("authorized") is True and live_status == "completed",
+        "job_id": passive.get("job_id"),
+        "test_case_id": passive.get("test_case_id"),
+        "target_origin": passive.get("target_origin"),
+        "endpoint": passive.get("endpoint"),
+        "method": "passive HEAD/OPTIONS/GET",
+        "environment": passive.get("environment"),
+        "requests_sent": passive.get("requests_sent", 0),
+        "response_status_code": passive.get("response_status_code"),
+        "elapsed_ms": passive.get("elapsed_ms"),
+        "reason": passive.get("reason"),
+        "reason_code": passive.get("reason_code"),
+        "limitations": passive.get("limitations", []),
+    }
+    return {key: value for key, value in summary.items() if value is not None}
+
+
 def _build_evaluated_response(
     request: SecurityAssessmentRequest,
     evaluation: dict[str, Any],
     live_result: dict[str, Any] | None = None,
+    passive_result: dict[str, Any] | None = None,
 ) -> SecurityResponse:
     """Build the production response only from trusted deterministic evaluation."""
     control_results = evaluation.get("control_results", [])
     control_results = [result for result in control_results if isinstance(result, dict)]
+    passive = _current_passive_result(request, passive_result)
+    if request.passive_assessment_requested:
+        # The passive assessment replaces the single HEAD observation.
+        live_result = _passive_live_summary(passive) if passive is not None else None
     if "external_surface" in request.requested_controls and request.live_testing_requested:
-        if (
+        if passive is not None:
+            control_results.append(_passive_control_result(request, passive))
+        elif request.passive_assessment_requested:
+            control_results.append(
+                _passive_control_result(
+                    request,
+                    {
+                        "status": "blocked",
+                        "reason": "No passive assessment result was recorded for this job.",
+                        "check_results": [],
+                    },
+                )
+            )
+        elif (
             isinstance(live_result, dict)
             and live_result.get("status") == "completed"
             and live_result.get("authorized") is True
@@ -447,11 +559,19 @@ def _build_evaluated_response(
                     f"{result.get('control', 'Security control')} was not assessed; "
                     f"missing evidence: {', '.join(missing)}."
                 )
-    scope_note = (
-        "Scope limitation: configuration validator outcomes describe profile "
-        "declarations; any live result is a separate single-request observation "
-        "and does not prove control effectiveness."
-    )
+    if passive is not None and passive.get("status") == "completed":
+        scope_note = (
+            "Scope limitation: passive observations describe what the externally "
+            f"visible surface returned to {passive.get('requests_sent', 0)} ordinary "
+            "request(s) and one TLS handshake; no attack payloads were sent, so they "
+            "do not prove that internal controls are effective."
+        )
+    else:
+        scope_note = (
+            "Scope limitation: configuration validator outcomes describe profile "
+            "declarations; any live result is a separate single-request observation "
+            "and does not prove control effectiveness."
+        )
     # The current Analysis contract forwards only the legacy flat issue and
     # recommendation fields, so carry this scope statement through that
     # compatible field as well as the richer limitations field.
@@ -471,13 +591,17 @@ def _build_evaluated_response(
                     "status", "authorized", "job_id", "test_case_id", "target_origin",
                     "endpoint", "method", "environment", "requests_sent",
                     "response_status_code", "elapsed_ms", "observed_security_headers",
-                    "error", "reason", "limitations",
+                    "error", "reason", "reason_code", "limitations",
                 )
                 if key in live_result
             }
             if live_status in {"completed", "failed"} and live_authorized:
                 live_mode = "configuration_and_live"
-            if live_status == "blocked":
+            if passive is not None:
+                # The passive control and its checks already carry the outcome
+                # and reason once; do not repeat them here.
+                pass
+            elif live_status == "blocked":
                 issues.append(
                     "Requested live security check was blocked: "
                     + str(live_result.get("reason", "the trusted safety checks did not allow it."))
@@ -509,6 +633,9 @@ def _build_evaluated_response(
         limitations.append(
             "No runtime security checks were performed; results describe configuration declarations only."
         )
+    if passive is not None and passive.get("status") == "completed":
+        # What the passive checks could not establish, in the report's own words.
+        limitations.extend(str(item) for item in passive.get("limitations", []))
     if request.live_testing_requested and live_status == "not_run":
         issues.append("Live security check was requested, but no live result was recorded.")
     if request.live_testing_requested and live_status in {"not_run", "blocked", "failed"}:
@@ -561,6 +688,17 @@ def _build_evaluated_response(
         live_testing_authorized=live_authorized,
         live_testing_status=live_status,
         live_test_result=safe_live_result,
+        assessment_outcome=(
+            (passive.get("assessment_outcome") if passive is not None else "not_assessed")
+            if request.passive_assessment_requested
+            else None
+        ),
+        check_summary=(passive.get("check_summary", {}) if passive is not None else {}),
+        check_results=(
+            [c for c in passive.get("check_results", []) if isinstance(c, dict)]
+            if passive is not None
+            else []
+        ),
         requested_controls=request.requested_controls,
         requested_controls_source=request.requested_controls_source,
         assessed_controls=[result["control"] for result in assessed],

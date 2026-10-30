@@ -148,6 +148,10 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
     )
 
     if execution_mode == "REAL":
+        # "generated" or "reused" for this run's script, so it is visible downstream
+        # and a reused script is never mistaken for a regenerated one.
+        script_source = None
+        tool_context.state["execution_script_source"] = None
         if (
             jmeter_task_requested
             and isinstance(profile, dict)
@@ -162,7 +166,10 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
                     "profile selects a different tool. No execution was run."
                 ),
                 blocked_reasons=[
-                    "The requested tool does not match the trusted workload profile."
+                    "The requested tool does not match the trusted workload profile "
+                    f"(profile tool: {profile.get('tool')}). To run this case with "
+                    "JMeter, name the runner explicitly, for example "
+                    "'Run <test case ID> using JMeter'."
                 ],
             ).model_dump(mode="json")
             tool_context.state["execution_status"] = result["status"]
@@ -222,6 +229,8 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
                         ],
                     ).model_dump(mode="json")
                 else:
+                    script_source = generated.get("script_source")
+                    tool_context.state["execution_script_source"] = script_source
                     manifest = tool_context.state.get("execution_artifacts") or {}
                     artifacts = dict(manifest.get("artifacts") or {})
                     artifacts["generated_script"] = generated["artifact_path"]
@@ -311,6 +320,8 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
                     test_case_name=tool_context.state.get("test_case_name"),
                 )
                 if generated.get("status") == "success":
+                    script_source = generated.get("script_source")
+                    tool_context.state["execution_script_source"] = script_source
                     manifest = tool_context.state.get("execution_artifacts") or {}
                     artifacts = dict(manifest.get("artifacts") or {})
                     artifacts["generated_script"] = generated["artifact_path"]
@@ -394,6 +405,8 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
                     ).model_dump(mode="json")
         else:
             result = real_execution_gate(tool_context.state)
+        if script_source is not None and isinstance(result, dict):
+            result["script_source"] = script_source
         tool_context.state["execution_status"] = result["status"]
         tool_context.state["execution_stage_result"] = result
         return result

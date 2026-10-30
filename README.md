@@ -128,6 +128,20 @@ redirect cannot send load to a second host. The runner repeats target
 validation immediately before execution. For production deployments, enforce
 the same destination policy with network egress controls as well.
 
+#### Stored script reuse
+
+For catalog test cases (`PTC-` / `WTC-` IDs), the reviewed REAL k6 or JMeter
+script is stored once under `<artifact root>/_script_library/<tool>/<test case>/`
+and copied into each later job folder instead of being rebuilt. A stored script
+is reused only when a fingerprint of the full workload profile, the template's
+source and the Python version still matches and its SHA-256 is intact, so any
+change to the test case (users, duration, thresholds, target...) regenerates
+the script and replaces the stored one. Each runner keeps its own stored script.
+The target-allowlist/limit preflight is re-run on every reuse, and the runners
+still rebuild and compare the script before executing it. Anything unexpected
+falls back to building the script as before. Set `SCRIPT_REUSE_ENABLED=false`
+to build a fresh script on every run.
+
 ### JMeter and Java installation, configuration, and native reports
 
 REAL JMeter execution requires Apache JMeter and Java to be installed on the
@@ -390,6 +404,74 @@ artifacts return HTTP 404. Responses are private and non-cacheable. The
 current authorization is one shared bearer token for the service and does
 not provide per-user or per-tenant artifact ACLs; deploy behind an
 identity-aware gateway if callers need individual authorization.
+
+### Automatic passive security assessment of external APIs
+
+Every REAL run against an external HTTPS API is assessed by the security agent
+without being asked, after the performance run has ended. The assessment is
+passive and non-intrusive: it never sends an attack payload, a request body, or
+a state-changing request, and it needs no LLM call. It is not a penetration
+test. Attack-style testing of services you do not own is deliberately not part
+of it.
+
+**What runs.** One TLS handshake with certificate verification on, plus at most
+five ordinary `HEAD`/`GET`/`OPTIONS` requests to the job's own target (the
+catalog test case's `target_url` and `endpoint`), and, from the performance
+run's own results, the status-code distribution. If the declared method is
+`POST`/`PUT`/`PATCH`/`DELETE`, that method is never sent; `OPTIONS` is used
+instead and header checks that would need a normal response are inconclusive.
+
+| Check id | What it looks at |
+|---|---|
+| `tls_protocol`, `tls_certificate` | negotiated TLS version and cipher; chain, hostname and expiry |
+| `https_redirect` | plain HTTP on port 80 redirects to HTTPS (or is closed) |
+| `header_hsts`, `header_x_content_type_options`, `header_frame_protection`, `header_csp`, `header_referrer_policy`, `header_permissions_policy`, `header_cache_control` | response security headers and their values |
+| `header_information_disclosure`, `header_cookie_attributes` | `Server`/`X-Powered-By` version leaks; Secure/HttpOnly/SameSite (only when a cookie is set) |
+| `cors_foreign_origin` | CORS preflight sent with a reserved foreign origin |
+| `http_methods_exposed` | `Allow` header from `OPTIONS` (TRACE, CONNECT, WebDAV) |
+| `error_leakage` | stack traces, database errors, debug pages or server paths in the error response for a missing resource |
+| `rate_limit_evidence` | HTTP 429 in the run's own traffic, or rate-limit headers (positive evidence only) |
+
+**One verdict per check.** Each check is `passed`, `failed` or `inconclusive`,
+with its severity, a one-line reason, the evidence and, for a failure, a
+recommendation. The overall status (`PASS`, `WARNING`, `FAIL`) and the score are
+computed only from the assessed (passed or failed) checks: a failed
+high/critical check gives `FAIL`, a failed medium/low check gives `WARNING`, and
+informational checks never change the status. An `inconclusive` check is never
+counted as a pass or a failure. An HTTP 401, 403, 404, 405, 429 or 5xx on the
+resource itself never counts as a pass, and missing headers on such a response
+are never counted as a failure. `assessment_outcome` says whether everything was
+assessed, only some checks were (`partially_assessed`), or none were.
+
+**Scope rules (independent of the load-test allowlist).** A target is accepted
+when it is a public HTTPS host with no credentials in the URL, a DNS name (not an
+IP literal), port 443 only, and every address it resolves to is globally
+routable (loopback, private, link-local, carrier-grade NAT and cloud-metadata
+addresses are refused). Connections go to the addresses verified once, so a
+changing DNS answer cannot redirect a probe. If `environment` is missing from the
+profile it is inferred as `external_api`. Port 80 is contacted only for the
+redirect check.
+
+**Reading the results.** Findings describe the externally visible edge, which
+may be a CDN or WAF in front of the application. On a network that inspects TLS,
+the certificate seen is the proxy's; compare the issuer in the evidence.
+
+**Switches.**
+
+- `SECURITY_AUTO_ASSESSMENT_ENABLED` (default `true`): assess REAL runs against
+  external APIs automatically. Set `false` to run security only when asked.
+- `SECURITY_PASSIVE_ASSESSMENT_ENABLED` (default `true`): master switch for every
+  passive request, including those of an explicit security request. When `false`,
+  explicit requests fall back to the older single `HEAD` observation, which still
+  needs `SECURITY_LIVE_TESTS_ENABLED=true`.
+- Per run, write "skip security" or "do not run security" in the request or Jira
+  text. Security wording ("assess the security surface") runs the full security
+  agent as before, now with the same passive checks plus any configuration
+  controls requested; "configuration-only" sends nothing.
+
+The automatic path is model-free and deterministic. Its result is stored as the
+job's `security_result`, carried through Analysis with every per-check verdict
+intact, and printed in the PDF under "Security Findings (Security Agent)".
 
 ### Running PTC-012 from ADK web
 

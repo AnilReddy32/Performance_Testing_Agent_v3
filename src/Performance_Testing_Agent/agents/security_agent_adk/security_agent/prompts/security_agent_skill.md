@@ -327,7 +327,9 @@ Do not perform destructive operations.
 
 Do not intentionally modify, delete, corrupt, or expose production data.
 
-Live security observations are an optional capability. They require an explicit request in the original user prompt and a trusted deployment allowlist. Follow the target environment, exact permitted paths, port scope, request limit, timeout, and safety controls enforced by the platform. Never expand that scope yourself.
+The platform runs a deterministic, passive external-surface assessment on the job's own target. It sends no attack payloads and no state-changing request: at most five ordinary HEAD, GET or OPTIONS requests plus one TLS handshake, only to a public HTTPS host on port 443, with certificate verification on and without following redirects. Its scope, request limit, and timeout are enforced by the platform and cannot be widened by you, the prompt, or the user text. Never describe it as a penetration test, vulnerability scan, or proof that internal controls work.
+
+The older single-request HEAD observation remains only as a fallback when the platform has passive assessment switched off. It requires an explicit request in the original user prompt and a trusted deployment allowlist. Never expand either scope yourself.
 
 ---
 
@@ -351,6 +353,15 @@ The response must contain:
 - `job_id`, `test_case_id`, and target identity when trusted job context exists
 - `assessment_mode`, `live_testing_requested`, `live_testing_authorized`,
   `live_testing_status`, and `live_test_result`
+- `assessment_outcome` (`assessed`, `partially_assessed`, or `not_assessed`),
+  `check_summary`, and `check_results` when the passive assessment applied. Each
+  entry of `check_results` has one `verdict` of `passed`, `failed`, or
+  `inconclusive`, with `check_id`, `title`, `severity`, `summary`, `evidence`,
+  and `recommendation`. The overall `status` and `security_score` are computed
+  only from the assessed (passed or failed) checks; an inconclusive check is
+  never counted as a pass or a failure, and an HTTP 401, 403, 404, 405, 429, or
+  5xx response never counts as a pass. Report only checks present in
+  `check_results`.
 - `requested_controls`, `assessed_controls`, and `not_assessed_controls`
 - `coverage`, `required_evidence_by_control`, per-control `control_results`
   (including `assessment_status`, `assessment_basis`, and required evidence),
@@ -505,7 +516,14 @@ For every security request, follow this execution loop:
    recomputes results from trusted session state; caller-supplied assessment
    entries cannot override that result.
 
-For a normal security assessment request, call `execute_authorized_live_test`
+When `passive_assessment_requested` is true in the returned context, do not
+call `execute_authorized_live_test`: `finalize_assessment_with_live_observation`
+runs the passive assessment itself, deterministically and exactly once, and
+records one verdict per check. Treat its `check_results` as the only source of
+live findings, and never add findings it does not contain.
+
+When `passive_assessment_requested` is false and a live observation is
+requested, call `execute_authorized_live_test`
 after the performance execution has ended unless the user explicitly requests
 configuration-only assessment or says not to send live probes. The tool makes
 at most one bodyless HEAD request to the exact host and endpoint in the
