@@ -13,6 +13,7 @@ from Performance_Testing_Agent.jira_agent_integration.stage_plan import (
 )
 from Performance_Testing_Agent.jira_agent_integration.test_case_resolver import (
     resolve_issue_test_case,
+    resolve_text_test_case,
     build_test_case_prompt,
 )
 from Performance_Testing_Agent.execution_context import (
@@ -294,8 +295,21 @@ async def process_single_issue(issue):
     #   1. Test Case ID selected -> prompt from the test case repo
     #   2. Attachment added      -> data from the attachment
     #   3. Default               -> Jira summary and description
+    description_text = adf_to_text(description).strip()
+
     try:
         test_definition = resolve_issue_test_case(issue)
+
+        # No Test Case ID selected, but the text names exactly one catalog case
+        # ("Run PTC-005 using JMeter"): treat it as selected, so the issue gets
+        # the plan comment and the REAL run. Attachments keep their precedence.
+        if test_definition is None and not attachments:
+            test_definition = resolve_text_test_case(summary, description_text)
+            if test_definition is not None:
+                print(
+                    f"{issue_key}: Test Case ID field is empty; using "
+                    f"{test_definition['test_case_id']} named in the Jira text."
+                )
 
     except ValueError as exc:
         print(f"{issue_key}: Test-case validation failed: {exc}")
@@ -306,8 +320,6 @@ async def process_single_issue(issue):
             "status": "Validation Failed",
             "error": str(exc),
         }
-
-    description_text = adf_to_text(description).strip()
 
     # With a Test Case ID selected, every workload value comes from the
     # catalog. The only thing the Jira text may change is the runner: naming
