@@ -206,7 +206,7 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
             if profile.get("tool") == "jmeter":
                 generated = generate_script(
                     tool="jmeter",
-                    application=str(profile.get("application") or "Unknown"),
+                    application=str(tool_context.state.get("application") or "Unknown"),
                     scenario=str(profile.get("scenario") or "Performance Test"),
                     api_name=str(profile.get("api_name") or profile.get("endpoint")),
                     execution_mode="REAL",
@@ -247,7 +247,7 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
                             ],
                             script_path=generated["file_path"],
                             test_case_id=tool_context.state.get("test_case_id"),
-                            application=str(profile.get("application") or "Unknown"),
+                            application=str(tool_context.state.get("application") or "Unknown"),
                             scenario=str(
                                 tool_context.state.get("test_case_name")
                                 or profile.get("scenario")
@@ -307,7 +307,7 @@ def run_test_execution_adk(user_request: str, tool_context: ToolContext) -> dict
             else:
                 generated = generate_script(
                     tool="k6",
-                    application=str(profile.get("application") or "Unknown"),
+                    application=str(tool_context.state.get("application") or "Unknown"),
                     scenario=str(profile.get("scenario") or "Performance Test"),
                     api_name=str(profile.get("api_name") or profile.get("endpoint")),
                     execution_mode="REAL",
