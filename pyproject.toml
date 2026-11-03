@@ -28,6 +28,8 @@ dependencies = [
     "sentence-transformers>=5.6.1",
     "truststore>=0.10.0",
     "uvicorn>=0.52.1",
+    "pypdf>=6.21.4",
+    "pip-system-certs>=5.3",
 ]
 
 [project.scripts]

@@ -14,6 +14,8 @@ sentence-transformers
 numpy
 pandas
 openpyxl
+pypdf
+pip-system-certs
 psutil
 reportlab
 pytest
