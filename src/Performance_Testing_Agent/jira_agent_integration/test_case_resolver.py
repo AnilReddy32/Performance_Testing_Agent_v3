@@ -2,7 +2,7 @@ import re
 
 from Performance_Testing_Agent.test_case_catalog.catalog import get_test_case
 
-TEST_CASE_FIELD_ID = "customfield_10332"
+TEST_CASE_FIELD_ID = "customfield_10083"
 
 # "PTC-005", and the spellings people type: "PTC 005", "ptc005".
 _TEXT_TEST_CASE_ID = re.compile(r"\b(PTC|WTC)[-_ ]?(\d{3})\b", re.IGNORECASE)
