@@ -1,6 +1,6 @@
 from Performance_Testing_Agent.test_case_catalog.catalog import get_test_case
 
-TEST_CASE_FIELD_ID = "customfield_10332"
+TEST_CASE_FIELD_ID = "customfield_10083"
 
 
 def resolve_issue_test_case(issue: dict) -> dict | None:

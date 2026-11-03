@@ -39,7 +39,7 @@ def get_pending_issues():
             "jql": jql,
             "fields": (
                 "summary,description,status,labels,attachment,"
-                "customfield_10332"
+                "customfield_10083"
             ),
             "maxResults": 10
         },
